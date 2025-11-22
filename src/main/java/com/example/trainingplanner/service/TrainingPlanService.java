@@ -1,6 +1,5 @@
 package com.example.trainingplanner.service;
 
-import com.example.trainingplanner.model.Exercise;
 import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.PlayerPair;
 import com.example.trainingplanner.model.TrainingSession;
@@ -44,75 +43,60 @@ public class TrainingPlanService {
         return pairs;
     }
 
-    public TrainingSession generatePlan(int totalTimeMinutes, String trainingDate) throws Exception {
-        List<Exercise> allExercises = csvService.readExercises();
+    public TrainingSession generatePlan(int totalTimeMinutes, String trainingDate, int numberOfExercises)
+            throws Exception {
         List<Player> allPlayers = csvService.readPlayersForDate(trainingDate);
 
-        // Filter exercises suitable for the player count (remove min/max player
-        // filtering)
-        List<Exercise> suitableExercises = new ArrayList<>(allExercises);
-
-        if (suitableExercises.isEmpty()) {
-            throw new RuntimeException("No exercises found.");
-        }
-
-        // Shuffle to get random selection
-        Collections.shuffle(suitableExercises);
-
-        List<Exercise> selectedExercises = new ArrayList<>();
-        int currentDuration = 0;
-
-        for (Exercise exercise : suitableExercises) {
-            if (currentDuration + exercise.getDurationMinutes() <= totalTimeMinutes) {
-                selectedExercises.add(exercise);
-                currentDuration += exercise.getDurationMinutes();
-            }
+        if (numberOfExercises < 1) {
+            throw new RuntimeException("Number of exercises must be at least 1.");
         }
 
         // Generate pairs for each exercise using ALL available players
-        Map<Exercise, List<PlayerPair>> exercisePairs = new HashMap<>();
+        // Each exercise will have a different unpaired player (if odd number of
+        // players)
+        Map<Integer, List<PlayerPair>> exercisePairs = new HashMap<>();
+        Map<Integer, Player> unpairedPlayers = new HashMap<>();
         int totalPlayers = allPlayers.size();
-        int pairsNeeded = totalPlayers / 2; // Pair up all players
-        Player unpairedPlayer = null;
+        int pairsNeeded = totalPlayers / 2;
 
-        // If odd number of players, one will be left unpaired
-        if (totalPlayers % 2 != 0 && totalPlayers > 0) {
-            // Shuffle and take the last player as unpaired
-            List<Player> shuffledPlayers = new ArrayList<>(allPlayers);
-            Collections.shuffle(shuffledPlayers);
-            unpairedPlayer = shuffledPlayers.get(shuffledPlayers.size() - 1);
+        for (int exerciseNumber = 1; exerciseNumber <= numberOfExercises; exerciseNumber++) {
+            if (totalPlayers % 2 != 0 && totalPlayers > 0) {
+                // Odd number of players - shuffle and select one as unpaired
+                List<Player> shuffledPlayers = new ArrayList<>(allPlayers);
+                Collections.shuffle(shuffledPlayers);
 
-            // Remove unpaired player from the list for pairing
-            List<Player> playersForPairing = new ArrayList<>(shuffledPlayers);
-            playersForPairing.remove(playersForPairing.size() - 1);
+                // Last player in shuffled list is unpaired for this exercise
+                Player unpairedPlayer = shuffledPlayers.get(shuffledPlayers.size() - 1);
+                unpairedPlayers.put(exerciseNumber, unpairedPlayer);
 
-            for (Exercise exercise : selectedExercises) {
+                // Remove unpaired player from pairing list
+                List<Player> playersForPairing = new ArrayList<>(shuffledPlayers);
+                playersForPairing.remove(playersForPairing.size() - 1);
+
                 if (playersForPairing.size() >= 2) {
                     List<PlayerPair> pairs = generatePairs(playersForPairing, pairsNeeded);
-                    exercisePairs.put(exercise, pairs);
+                    exercisePairs.put(exerciseNumber, pairs);
                 } else {
-                    exercisePairs.put(exercise, new ArrayList<>());
+                    exercisePairs.put(exerciseNumber, new ArrayList<>());
                 }
-            }
-        } else {
-            // Even number of players, pair them all
-            for (Exercise exercise : selectedExercises) {
+            } else {
+                // Even number of players - pair them all
                 if (totalPlayers >= 2) {
                     List<PlayerPair> pairs = generatePairs(allPlayers, pairsNeeded);
-                    exercisePairs.put(exercise, pairs);
+                    exercisePairs.put(exerciseNumber, pairs);
                 } else {
-                    exercisePairs.put(exercise, new ArrayList<>());
+                    exercisePairs.put(exerciseNumber, new ArrayList<>());
                 }
             }
         }
 
         TrainingSession session = new TrainingSession();
-        session.setExercises(selectedExercises);
-        session.setTotalDuration(currentDuration);
+        session.setNumberOfExercises(numberOfExercises);
+        session.setTotalDuration(totalTimeMinutes);
         session.setPlayerCount(totalPlayers);
-        session.setNotes("Generated plan with " + selectedExercises.size() + " exercises.");
+        session.setNotes("Generated plan with " + numberOfExercises + " exercises.");
         session.setExercisePairs(exercisePairs);
-        session.setUnpairedPlayer(unpairedPlayer);
+        session.setUnpairedPlayers(unpairedPlayers);
 
         return session;
     }

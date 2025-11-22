@@ -1,17 +1,11 @@
 package com.example.trainingplanner.service;
 
-import com.example.trainingplanner.model.Exercise;
 import com.example.trainingplanner.model.Player;
-import com.opencsv.bean.CsvToBeanBuilder;
-import com.opencsv.bean.StatefulBeanToCsv;
-import com.opencsv.bean.StatefulBeanToCsvBuilder;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -25,43 +19,7 @@ import java.util.Locale;
 @Service
 public class CsvService {
 
-    private static final String EXERCISES_FILE = "Exercises.csv";
     private static final String PLAYERS_FILE = "Einteilung.csv";
-
-    public List<Exercise> readExercises() {
-        Path path = Paths.get(EXERCISES_FILE);
-        if (!Files.exists(path)) {
-            return new ArrayList<>();
-        }
-
-        try (FileReader reader = new FileReader(EXERCISES_FILE)) {
-            List<Exercise> list = new CsvToBeanBuilder<Exercise>(reader)
-                    .withType(Exercise.class)
-                    .build()
-                    .parse();
-            System.out.println("Loaded " + list.size() + " exercises:");
-            list.forEach(System.out::println);
-            return list;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-    }
-
-    public void saveExercise(Exercise exercise) {
-        List<Exercise> exercises = readExercises();
-        exercises.add(exercise);
-        writeExercises(exercises);
-    }
-
-    private void writeExercises(List<Exercise> exercises) {
-        try (Writer writer = new FileWriter(EXERCISES_FILE)) {
-            StatefulBeanToCsv<Exercise> beanToCsv = new StatefulBeanToCsvBuilder<Exercise>(writer).build();
-            beanToCsv.write(exercises);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
     public List<Player> readPlayers() {
         Path path = Paths.get(PLAYERS_FILE);

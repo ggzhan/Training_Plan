@@ -1,6 +1,5 @@
 package com.example.trainingplanner.service;
 
-import com.example.trainingplanner.model.Exercise;
 import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.TrainingSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,59 +24,62 @@ class TrainingPlanServiceTest {
 
     @Test
     void generatePlan_shouldCreateValidSession() throws Exception {
-        // Mock data
-        Exercise e1 = createExercise("Warmup", 10, 5, 20, "Warmup");
-        Exercise e2 = createExercise("Drill 1", 20, 10, 20, "Drill");
-        Exercise e3 = createExercise("Drill 2", 30, 10, 20, "Drill");
-        Exercise e4 = createExercise("Scrimmage", 30, 10, 20, "Scrimmage");
-
-        csvServiceStub.setExercises(Arrays.asList(e1, e2, e3, e4));
+        // Mock players
+        List<Player> players = Arrays.asList(
+                new Player("Player 1"),
+                new Player("Player 2"),
+                new Player("Player 3"),
+                new Player("Player 4"),
+                new Player("Player 5"));
+        csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(60, "22. November");
+        TrainingSession session = trainingPlanService.generatePlan(90, "22. November", 3);
 
         // Verify
         assertNotNull(session);
-        assertTrue(session.getTotalDuration() <= 60);
-        assertFalse(session.getExercises().isEmpty());
+        assertEquals(90, session.getTotalDuration());
+        assertEquals(3, session.getNumberOfExercises());
+        assertEquals(5, session.getPlayerCount());
+        assertNotNull(session.getExercisePairs());
+        assertEquals(3, session.getExercisePairs().size());
 
-        System.out.println("Generated Plan Duration: " + session.getTotalDuration());
-        session.getExercises()
-                .forEach(e -> System.out.println("- " + e.getName() + " (" + e.getDurationMinutes() + "m)"));
+        System.out.println("Generated Plan: " + session.getNotes());
+        System.out.println("Number of Exercises: " + session.getNumberOfExercises());
+        System.out.println("Player Count: " + session.getPlayerCount());
     }
 
-    private Exercise createExercise(String name, int duration, int min, int max, String type) {
-        Exercise e = new Exercise();
-        e.setName(name);
-        e.setDurationMinutes(duration);
-        e.setMinPlayers(min);
-        e.setMaxPlayers(max);
-        e.setType(type);
-        return e;
+    @Test
+    void generatePlan_withOddPlayers_shouldHaveUnpairedPlayers() throws Exception {
+        // Mock players (odd number)
+        List<Player> players = Arrays.asList(
+                new Player("Player 1"),
+                new Player("Player 2"),
+                new Player("Player 3"));
+        csvServiceStub.setPlayers(players);
+
+        // Test
+        TrainingSession session = trainingPlanService.generatePlan(60, "22. November", 2);
+
+        // Verify
+        assertNotNull(session);
+        assertEquals(2, session.getNumberOfExercises());
+        assertEquals(3, session.getPlayerCount());
+        assertNotNull(session.getUnpairedPlayers());
+        assertEquals(2, session.getUnpairedPlayers().size()); // Each exercise should have an unpaired player
     }
 
     // Manual Stub
     static class CsvServiceStub extends CsvService {
-        private List<Exercise> exercises;
+        private List<Player> players;
 
-        public void setExercises(List<Exercise> exercises) {
-            this.exercises = exercises;
-        }
-
-        @Override
-        public List<Exercise> readExercises() {
-            return exercises;
-        }
-
-        @Override
-        public void saveExercise(Exercise exercise) {
-            // No-op for test
+        public void setPlayers(List<Player> players) {
+            this.players = players;
         }
 
         @Override
         public List<Player> readPlayersForDate(String date) {
-            // Return empty list for test
-            return new ArrayList<>();
+            return players != null ? players : new ArrayList<>();
         }
     }
 }

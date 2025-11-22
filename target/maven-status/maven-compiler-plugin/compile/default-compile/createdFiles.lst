@@ -1,9 +1,7 @@
-com/example/trainingplanner/controller/ExerciseController.class
-com/example/trainingplanner/model/Exercise.class
-com/example/trainingplanner/model/PlayerPair.class
-com/example/trainingplanner/controller/TrainingController.class
 com/example/trainingplanner/TrainingPlannerApplication.class
 com/example/trainingplanner/model/Player.class
+com/example/trainingplanner/model/PlayerPair.class
 com/example/trainingplanner/service/CsvService.class
 com/example/trainingplanner/model/TrainingSession.class
 com/example/trainingplanner/service/TrainingPlanService.class
+com/example/trainingplanner/controller/TrainingController.class

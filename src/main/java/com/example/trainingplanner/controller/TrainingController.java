@@ -31,9 +31,10 @@ public class TrainingController {
     public String generatePlan(
             @RequestParam("totalTime") int totalTime,
             @RequestParam("trainingDate") String trainingDate,
+            @RequestParam("numberOfExercises") int numberOfExercises,
             Model model) {
         try {
-            TrainingSession trainingPlan = trainingPlanService.generatePlan(totalTime, trainingDate);
+            TrainingSession trainingPlan = trainingPlanService.generatePlan(totalTime, trainingDate, numberOfExercises);
             System.out.println("Generated Plan: " + trainingPlan);
             model.addAttribute("trainingPlan", trainingPlan);
             return "plan";

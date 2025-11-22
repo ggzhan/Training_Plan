@@ -23,31 +23,36 @@
                     <div class="plan-stat-value" th:text="${trainingPlan.playerCount}">0</div>
                     <div class="plan-stat-label">Players</div>
                 </div>
+                <div class="plan-stat">
+                    <div class="plan-stat-value" th:text="${trainingPlan.numberOfExercises}">0</div>
+                    <div class="plan-stat-label">Exercises</div>
+                </div>
             </div>
 
             <ul class="exercise-list">
-                <li class="exercise-item" th:each="exercise : ${trainingPlan.exercises}">
+                <li class="exercise-item"
+                    th:each="exerciseNum : ${#numbers.sequence(1, trainingPlan.numberOfExercises)}">
                     <div class="exercise-info">
-                        <div class="exercise-name" th:text="${exercise.name}">Exercise Name</div>
-                        <div class="exercise-desc" th:text="${exercise.description}">Description</div>
-                        <div class="exercise-meta">
-                            <span class="exercise-tag" th:text="${exercise.type}">Type</span>
-                        </div>
+                        <div class="exercise-name" th:text="'Exercise ' + ${exerciseNum}">Exercise 1</div>
 
                         <!-- Player Pairs Section -->
                         <div class="player-pairs"
-                            th:if="${trainingPlan.exercisePairs.get(exercise) != null and !trainingPlan.exercisePairs.get(exercise).isEmpty()}">
+                            th:if="${trainingPlan.exercisePairs.get(exerciseNum) != null and !trainingPlan.exercisePairs.get(exerciseNum).isEmpty()}">
                             <div class="pairs-header">Assigned Pairs:</div>
                             <div class="pairs-list">
-                                <span class="pair-item" th:each="pair : ${trainingPlan.exercisePairs.get(exercise)}">
+                                <span class="pair-item" th:each="pair : ${trainingPlan.exercisePairs.get(exerciseNum)}">
                                     <span th:text="${pair.player1.name}">Player 1</span> & <span
                                         th:text="${pair.player2.name}">Player 2</span>
                                 </span>
                             </div>
                         </div>
-                    </div>
-                    <div class="exercise-duration" th:text="${exercise.durationMinutes} + ' min'">
-                        15 min
+
+                        <!-- Unpaired Player for this Exercise -->
+                        <div th:if="${trainingPlan.unpairedPlayers != null and trainingPlan.unpairedPlayers.get(exerciseNum) != null}"
+                            class="unpaired-warning" style="margin-top: 0.75rem;">
+                            <strong>⚠️ Unpaired:</strong> <span
+                                th:text="${trainingPlan.unpairedPlayers.get(exerciseNum).name}">Player Name</span>
+                        </div>
                     </div>
                 </li>
             </ul>
