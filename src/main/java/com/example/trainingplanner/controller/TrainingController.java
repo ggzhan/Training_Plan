@@ -2,7 +2,7 @@ package com.example.trainingplanner.controller;
 
 import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.TrainingSession;
-import com.example.trainingplanner.service.CsvService;
+import com.example.trainingplanner.service.GoogleSheetsService;
 import com.example.trainingplanner.service.TrainingPlanService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,30 +12,40 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @Controller
 public class TrainingController {
 
     private final TrainingPlanService trainingPlanService;
-    private final CsvService csvService;
+    private final GoogleSheetsService googleSheetsService;
 
-    public TrainingController(TrainingPlanService trainingPlanService, CsvService csvService) {
+    public TrainingController(TrainingPlanService trainingPlanService, GoogleSheetsService googleSheetsService) {
         this.trainingPlanService = trainingPlanService;
-        this.csvService = csvService;
+        this.googleSheetsService = googleSheetsService;
     }
 
     @GetMapping("/")
     public String index(Model model) {
-        model.addAttribute("trainingDates", csvService.getTrainingDates());
-        model.addAttribute("defaultDate", csvService.getNextTrainingDate());
+        model.addAttribute("trainingDates", googleSheetsService.getTrainingDates());
+        model.addAttribute("defaultDate", googleSheetsService.getNextTrainingDate());
         return "index";
     }
 
     @GetMapping("/api/players")
     @ResponseBody
     public List<Player> getPlayersForDate(@RequestParam("date") String date) {
-        return csvService.readPlayersForDate(date);
+        return googleSheetsService.readPlayersForDate(date);
+    }
+
+    @PostMapping("/api/refresh")
+    @ResponseBody
+    public Map<String, String> refreshData() {
+        googleSheetsService.refreshData();
+        return Map.of(
+                "status", "success",
+                "message", "Data refreshed successfully",
+                "lastRefresh", googleSheetsService.getLastRefreshTime().toString());
     }
 
     @PostMapping("/generate-plan")
@@ -52,8 +62,8 @@ public class TrainingController {
                         new com.fasterxml.jackson.core.type.TypeReference<List<Player>>() {
                         });
             } else {
-                // Fallback to reading from CSV
-                players = csvService.readPlayersForDate(trainingDate);
+                // Fallback to reading from Google Sheets
+                players = googleSheetsService.readPlayersForDate(trainingDate);
             }
 
             // Pass players to the service

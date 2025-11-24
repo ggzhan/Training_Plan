@@ -1,4 +1,5 @@
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/PlayerPair.java
+/home/gxz/Work/src/main/java/com/example/trainingplanner/service/GoogleSheetsService.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/Player.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/TrainingPlannerApplication.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/controller/TrainingController.java

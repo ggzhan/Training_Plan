@@ -14,8 +14,16 @@
 <body>
     <div class="container">
         <div class="card">
-            <h1>Training Planner</h1>
-            <p class="subtitle">Design your perfect training session</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h1 style="margin: 0;">Training Planner</h1>
+                    <p class="subtitle" style="margin: 0.5rem 0 0 0;">Design your perfect training session</p>
+                </div>
+                <button type="button" onclick="refreshData()" id="refreshBtn"
+                    style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600; font-size: 0.95rem; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3); transition: transform 0.2s;">
+                    🔄 Refresh Data
+                </button>
+            </div>
 
             <div th:if="${error}" class="error-message">
                 <p th:text="${error}"></p>

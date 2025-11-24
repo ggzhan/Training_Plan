@@ -1,3 +1,4 @@
+com/example/trainingplanner/service/GoogleSheetsService.class
 com/example/trainingplanner/model/Exercise.class
 com/example/trainingplanner/model/PlayerPair.class
 com/example/trainingplanner/controller/TrainingController.class

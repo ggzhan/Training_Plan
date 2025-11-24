@@ -1,3 +1,31 @@
+// ===== DATA REFRESH =====
+function refreshData() {
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = '🔄 Refreshing...';
+
+    fetch('/api/refresh', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Data refreshed:', data);
+            // Reload players for current date
+            loadPlayers();
+            btn.textContent = '✓ Refreshed!';
+            setTimeout(() => {
+                btn.textContent = '🔄 Refresh Data';
+                btn.disabled = false;
+            }, 2000);
+        })
+        .catch(error => {
+            console.error('Error refreshing data:', error);
+            btn.textContent = '✗ Error';
+            setTimeout(() => {
+                btn.textContent = '🔄 Refresh Data';
+                btn.disabled = false;
+            }, 2000);
+        });
+}
+
 // ===== PLAYER MANAGEMENT (for index.html) =====
 let currentPlayers = [];
 
