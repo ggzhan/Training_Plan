@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Training Planner App Loaded');
-    
+
     // Add simple animation to cards on load
     const card = document.querySelector('.card');
     if (card) {

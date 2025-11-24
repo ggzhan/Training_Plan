@@ -5,22 +5,15 @@ import java.util.Map;
 import java.util.Objects;
 
 public class TrainingSession {
-    private int numberOfExercises;
     private int totalDuration;
     private int playerCount;
     private String notes;
-    private Map<Integer, List<PlayerPair>> exercisePairs;
-    private Map<Integer, Player> unpairedPlayers;
+    private List<Exercise> exercises;
+    private Map<Exercise, List<PlayerPair>> exercisePairs;
+    private Map<Exercise, Player> unpairedPlayers;
+    private Map<Exercise, Integer> exerciseDiffSums; // Sum of Klassierung differences for each exercise
 
     public TrainingSession() {
-    }
-
-    public int getNumberOfExercises() {
-        return numberOfExercises;
-    }
-
-    public void setNumberOfExercises(int numberOfExercises) {
-        this.numberOfExercises = numberOfExercises;
     }
 
     public int getTotalDuration() {
@@ -47,20 +40,36 @@ public class TrainingSession {
         this.notes = notes;
     }
 
-    public Map<Integer, List<PlayerPair>> getExercisePairs() {
+    public List<Exercise> getExercises() {
+        return exercises;
+    }
+
+    public void setExercises(List<Exercise> exercises) {
+        this.exercises = exercises;
+    }
+
+    public Map<Exercise, List<PlayerPair>> getExercisePairs() {
         return exercisePairs;
     }
 
-    public void setExercisePairs(Map<Integer, List<PlayerPair>> exercisePairs) {
+    public void setExercisePairs(Map<Exercise, List<PlayerPair>> exercisePairs) {
         this.exercisePairs = exercisePairs;
     }
 
-    public Map<Integer, Player> getUnpairedPlayers() {
+    public Map<Exercise, Player> getUnpairedPlayers() {
         return unpairedPlayers;
     }
 
-    public void setUnpairedPlayers(Map<Integer, Player> unpairedPlayers) {
+    public void setUnpairedPlayers(Map<Exercise, Player> unpairedPlayers) {
         this.unpairedPlayers = unpairedPlayers;
+    }
+
+    public Map<Exercise, Integer> getExerciseDiffSums() {
+        return exerciseDiffSums;
+    }
+
+    public void setExerciseDiffSums(Map<Exercise, Integer> exerciseDiffSums) {
+        this.exerciseDiffSums = exerciseDiffSums;
     }
 
     @Override
@@ -72,22 +81,29 @@ public class TrainingSession {
         TrainingSession that = (TrainingSession) o;
         return totalDuration == that.totalDuration &&
                 playerCount == that.playerCount &&
-                numberOfExercises == that.numberOfExercises &&
                 Objects.equals(notes, that.notes) &&
+                Objects.equals(exercises, that.exercises) &&
                 Objects.equals(exercisePairs, that.exercisePairs) &&
-                Objects.equals(unpairedPlayers, that.unpairedPlayers);
+                Objects.equals(unpairedPlayers, that.unpairedPlayers) &&
+                Objects.equals(exerciseDiffSums, that.exerciseDiffSums);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(numberOfExercises, totalDuration, playerCount, notes, exercisePairs, unpairedPlayers);
+        return Objects.hash(totalDuration, playerCount, notes, exercises, exercisePairs, unpairedPlayers,
+                exerciseDiffSums);
     }
 
     @Override
     public String toString() {
-        return "TrainingSession{" + "numberOfExercises=" + numberOfExercises + ", totalDuration=" + totalDuration
-                + ", playerCount="
-                + playerCount + ", notes='" + notes + '\'' + ", exercisePairs=" + exercisePairs + ", unpairedPlayers="
-                + unpairedPlayers + '}';
+        return "TrainingSession{" +
+                "totalDuration=" + totalDuration +
+                ", playerCount=" + playerCount +
+                ", notes='" + notes + '\'' +
+                ", exercises=" + exercises +
+                ", exercisePairs=" + exercisePairs +
+                ", unpairedPlayers=" + unpairedPlayers +
+                ", exerciseDiffSums=" + exerciseDiffSums +
+                '}';
     }
 }

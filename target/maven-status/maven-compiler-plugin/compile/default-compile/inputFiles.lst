@@ -4,4 +4,5 @@
 /home/gxz/Work/src/main/java/com/example/trainingplanner/controller/TrainingController.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/service/TrainingPlanService.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/TrainingSession.java
+/home/gxz/Work/src/main/java/com/example/trainingplanner/model/Exercise.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/service/CsvService.java

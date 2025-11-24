@@ -1,5 +1,6 @@
 package com.example.trainingplanner.controller;
 
+import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.TrainingSession;
 import com.example.trainingplanner.service.CsvService;
 import com.example.trainingplanner.service.TrainingPlanService;
@@ -8,6 +9,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 public class TrainingController {
@@ -28,18 +33,17 @@ public class TrainingController {
     }
 
     @PostMapping("/generate-plan")
-    public String generatePlan(
-            @RequestParam("totalTime") int totalTime,
-            @RequestParam("trainingDate") String trainingDate,
-            @RequestParam("numberOfExercises") int numberOfExercises,
+    public String generatePlan(@RequestParam("trainingDate") String trainingDate,
+            @RequestParam(value = "numberOfExercises", defaultValue = "6") int numberOfExercises,
             Model model) {
         try {
-            TrainingSession trainingPlan = trainingPlanService.generatePlan(totalTime, trainingDate, numberOfExercises);
-            System.out.println("Generated Plan: " + trainingPlan);
-            model.addAttribute("trainingPlan", trainingPlan);
+            // Pass numberOfExercises to the service
+            TrainingSession session = trainingPlanService.generatePlan(0, trainingDate, null, numberOfExercises);
+            model.addAttribute("trainingPlan", session);
             return "plan";
         } catch (Exception e) {
-            model.addAttribute("error", e.getMessage());
+            e.printStackTrace();
+            model.addAttribute("error", "Error generating plan: " + e.getMessage());
             return "index";
         }
     }

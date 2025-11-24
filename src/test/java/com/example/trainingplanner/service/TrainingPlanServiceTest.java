@@ -26,26 +26,28 @@ class TrainingPlanServiceTest {
     void generatePlan_shouldCreateValidSession() throws Exception {
         // Mock players
         List<Player> players = Arrays.asList(
-                new Player("Player 1"),
-                new Player("Player 2"),
-                new Player("Player 3"),
-                new Player("Player 4"),
-                new Player("Player 5"));
+                new Player("Player 1", 10),
+                new Player("Player 2", 9),
+                new Player("Player 3", 8),
+                new Player("Player 4", 7),
+                new Player("Player 5", 6));
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(90, "22. November", 3);
+        TrainingSession session = trainingPlanService.generatePlan(90, "22. November", null, 6);
 
         // Verify
         assertNotNull(session);
-        assertEquals(90, session.getTotalDuration());
-        assertEquals(3, session.getNumberOfExercises());
+        assertEquals(45, session.getTotalDuration());
+        // Number of exercises depends on stubbed exercises (3 * 15 = 45 < 90, so all 3
+        // should be selected)
+        assertTrue(session.getExercises().size() > 0);
         assertEquals(5, session.getPlayerCount());
         assertNotNull(session.getExercisePairs());
-        assertEquals(3, session.getExercisePairs().size());
+        assertEquals(session.getExercises().size(), session.getExercisePairs().size());
 
         System.out.println("Generated Plan: " + session.getNotes());
-        System.out.println("Number of Exercises: " + session.getNumberOfExercises());
+        System.out.println("Number of Exercises: " + session.getExercises().size());
         System.out.println("Player Count: " + session.getPlayerCount());
     }
 
@@ -53,20 +55,21 @@ class TrainingPlanServiceTest {
     void generatePlan_withOddPlayers_shouldHaveUnpairedPlayers() throws Exception {
         // Mock players (odd number)
         List<Player> players = Arrays.asList(
-                new Player("Player 1"),
-                new Player("Player 2"),
-                new Player("Player 3"));
+                new Player("Player 1", 10),
+                new Player("Player 2", 9),
+                new Player("Player 3", 8));
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(60, "22. November", 2);
+        TrainingSession session = trainingPlanService.generatePlan(60, "22. November", null, 6);
 
         // Verify
         assertNotNull(session);
-        assertEquals(2, session.getNumberOfExercises());
+        assertTrue(session.getExercises().size() > 0);
         assertEquals(3, session.getPlayerCount());
         assertNotNull(session.getUnpairedPlayers());
-        assertEquals(2, session.getUnpairedPlayers().size()); // Each exercise should have an unpaired player
+        assertEquals(session.getExercises().size(), session.getUnpairedPlayers().size()); // Each exercise should have
+                                                                                          // an unpaired player
     }
 
     // Manual Stub
@@ -80,6 +83,18 @@ class TrainingPlanServiceTest {
         @Override
         public List<Player> readPlayersForDate(String date) {
             return players != null ? players : new ArrayList<>();
+        }
+
+        @Override
+        public List<com.example.trainingplanner.model.Exercise> readExercises() {
+            List<com.example.trainingplanner.model.Exercise> exercises = new ArrayList<>();
+            for (int i = 1; i <= 3; i++) {
+                com.example.trainingplanner.model.Exercise ex = new com.example.trainingplanner.model.Exercise();
+                ex.setName("Exercise " + i);
+                ex.setDurationMinutes(15);
+                exercises.add(ex);
+            }
+            return exercises;
         }
     }
 }

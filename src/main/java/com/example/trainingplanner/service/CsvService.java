@@ -1,5 +1,6 @@
 package com.example.trainingplanner.service;
 
+import com.example.trainingplanner.model.Exercise;
 import com.example.trainingplanner.model.Player;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.MonthDay;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -91,7 +93,8 @@ public class CsvService {
                 if (!dateStr.isEmpty() && !dateStr.equals("Name")) {
                     try {
                         // Parse date (assumes current year)
-                        LocalDate date = LocalDate.parse(dateStr, formatter).withYear(today.getYear());
+                        MonthDay monthDay = MonthDay.parse(dateStr, formatter);
+                        LocalDate date = monthDay.atYear(today.getYear());
 
                         // If the date is in the past but within the same year, try next year
                         if (date.isBefore(today)) {
@@ -101,13 +104,17 @@ public class CsvService {
                         // Only add if today or future
                         if (!date.isBefore(today)) {
                             dates.add(dateStr);
+                        } else {
+                            System.out.println("Skipping past date: " + dateStr + " (" + date + ")");
                         }
                     } catch (DateTimeParseException e) {
                         // If parsing fails, include the date anyway
+                        System.out.println("Failed to parse date: " + dateStr + " - " + e.getMessage());
                         dates.add(dateStr);
                     }
                 }
             }
+            System.out.println("Found dates: " + dates);
             return dates;
         } catch (IOException e) {
             e.printStackTrace();
@@ -122,6 +129,49 @@ public class CsvService {
         }
         // For now, return the first date (can be enhanced with date comparison)
         return dates.get(0);
+    }
+
+    public List<Exercise> readExercises() {
+        Path path = Paths.get("Exercises.csv");
+        if (!Files.exists(path)) {
+            return new ArrayList<>();
+        }
+
+        List<com.example.trainingplanner.model.Exercise> exercises = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader("Exercises.csv"))) {
+            String line;
+            // Skip header
+            reader.readLine();
+
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().isEmpty())
+                    continue;
+
+                String[] parts = line.split(",", -1);
+                if (parts.length >= 4) {
+                    String name = parts[0].trim();
+                    String description = parts[1].trim();
+                    String type = parts[2].trim();
+                    int duration = 15; // Default
+                    try {
+                        duration = Integer.parseInt(parts[3].trim());
+                    } catch (NumberFormatException e) {
+                        // Use default
+                    }
+
+                    com.example.trainingplanner.model.Exercise exercise = new com.example.trainingplanner.model.Exercise();
+                    exercise.setName(name);
+                    exercise.setDescription(description);
+                    exercise.setType(type);
+                    exercise.setDurationMinutes(duration);
+                    exercises.add(exercise);
+                }
+            }
+            return exercises;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
     }
 
     public List<Player> readPlayersForDate(String targetDate) {
@@ -152,40 +202,56 @@ public class CsvService {
                 return new ArrayList<>();
             }
 
-            // Skip "Freie Plätze" row
-            reader.readLine();
-
             String line;
-            int lineNumber = 2; // Already read 2 lines
-
             while ((line = reader.readLine()) != null) {
-                lineNumber++;
-
                 // Skip empty lines
                 if (line.trim().isEmpty()) {
                     continue;
                 }
 
-                String[] parts = line.split(",", -1); // -1 to keep empty trailing fields
-                if (parts.length > 0 && !parts[0].trim().isEmpty()) {
-                    String playerName = parts[0].trim();
+                String[] columns = line.split(",", -1);
 
-                    // Skip footer rows and numeric-only values
-                    if (!playerName.equals("Max Teilnehmer pro Training") && !playerName.matches("\\d+")) {
-                        // Check if player is available for this date
-                        if (dateColumnIndex < parts.length) {
-                            String availability = parts[dateColumnIndex].trim();
-                            // Check for 'X', 'x', or 'x(n)' patterns
-                            if (availability.matches("(?i)x.*")) {
-                                players.add(new Player(playerName));
-                            }
+                // Skip rows that don't have enough columns
+                if (columns.length <= dateColumnIndex) {
+                    continue;
+                }
+
+                // Skip footer rows (e.g. "Max Teilnehmer pro Training")
+                if (columns.length > 1 && columns[1].startsWith("Max Teilnehmer")) {
+                    continue;
+                }
+
+                // Skip "Freie Plätze" row
+                if (columns.length > 1 && columns[1].trim().equals("Freie Plätze")) {
+                    continue;
+                }
+
+                String name = columns[1].trim(); // Name is now in column 1 (index 1)
+
+                // Skip empty names or numeric-only names (like row numbers if any)
+                if (name.isEmpty() || name.matches("\\d+")) {
+                    continue;
+                }
+
+                String availability = columns[dateColumnIndex].trim();
+
+                // Check availability (X or x(n))
+                if (availability.equalsIgnoreCase("X") || availability.toLowerCase().startsWith("x(")) {
+                    int klassierung = 0;
+                    try {
+                        // Parse Klassierung from column 0
+                        String klassierungStr = columns[0].trim();
+                        if (!klassierungStr.isEmpty()) {
+                            klassierung = Integer.parseInt(klassierungStr);
                         }
+                    } catch (NumberFormatException e) {
+                        // Default to 0 if parsing fails
+                        System.err.println("Failed to parse Klassierung for player " + name + ": " + columns[0]);
                     }
+                    players.add(new Player(name, klassierung));
                 }
             }
 
-            System.out.println("Loaded " + players.size() + " players for date: " + targetDate);
-            players.forEach(System.out::println);
             return players;
         } catch (IOException e) {
             e.printStackTrace();
