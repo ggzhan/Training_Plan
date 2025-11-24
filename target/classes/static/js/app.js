@@ -28,90 +28,104 @@ function refreshData() {
 
 // ===== PLAYER MANAGEMENT (for index.html) =====
 let currentPlayers = [];
+let editingPlayerIndex = null;
+let playerModal = null;
 
-// Initialize player management if on index page
-if (document.getElementById('trainingDate')) {
-    document.addEventListener('DOMContentLoaded', function () {
-        const dateSelect = document.getElementById('trainingDate');
-        const addPlayerBtn = document.getElementById('addPlayerBtn');
-        const planForm = document.getElementById('planForm');
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function () {
+    // Only run on index.html
+    if (document.getElementById('planForm')) {
+        // Initialize Bootstrap modal
+        const modalElement = document.getElementById('playerModal');
+        if (modalElement) {
+            playerModal = new bootstrap.Modal(modalElement);
+        }
 
         // Load players when date changes
-        dateSelect.addEventListener('change', loadPlayers);
-
-        // Load players on initial page load
-        loadPlayers();
+        const dateSelect = document.getElementById('trainingDate');
+        if (dateSelect) {
+            dateSelect.addEventListener('change', loadPlayers);
+            loadPlayers(); // Initial load
+        }
 
         // Add player button
-        addPlayerBtn.addEventListener('click', showAddPlayerModal);
+        const addPlayerBtn = document.getElementById('addPlayerBtn');
+        if (addPlayerBtn) {
+            addPlayerBtn.addEventListener('click', () => {
+                openAddPlayerModal();
+                playerModal.show();
+            });
+        }
 
-        // Form submission - populate hidden field
-        planForm.addEventListener('submit', function (e) {
-            document.getElementById('playersJson').value = JSON.stringify(currentPlayers);
-        });
-    });
-}
+        // Form submission handler
+        const form = document.getElementById('planForm');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                // Populate hidden input with current players
+                document.getElementById('playersJson').value = JSON.stringify(currentPlayers);
+            });
+        }
+    }
+});
 
 function loadPlayers() {
-    const date = document.getElementById('trainingDate').value;
-    fetch(`/api/players?date=${encodeURIComponent(date)}`)
+    const dateSelect = document.getElementById('trainingDate');
+    if (!dateSelect) return;
+
+    const selectedDate = dateSelect.value;
+
+    fetch(`/api/players?date=${encodeURIComponent(selectedDate)}`)
         .then(response => response.json())
         .then(players => {
             currentPlayers = players;
             renderPlayerList();
         })
-        .catch(error => {
-            console.error('Error loading players:', error);
-        });
+        .catch(error => console.error('Error loading players:', error));
 }
 
 function renderPlayerList() {
     const tbody = document.getElementById('playerListBody');
-    const playerCount = document.getElementById('playerCount');
+    const countSpan = document.getElementById('playerCount');
+
+    if (!tbody) return;
 
     tbody.innerHTML = '';
-    playerCount.textContent = currentPlayers.length;
+    countSpan.textContent = currentPlayers.length;
 
     currentPlayers.forEach((player, index) => {
         const row = document.createElement('tr');
-        row.style.borderBottom = '1px solid #e5e7eb';
         row.innerHTML = `
-            <td style="padding: 0.75rem;">${player.name}</td>
-            <td style="padding: 0.75rem; text-align: center;">${player.klassierung}</td>
-            <td style="padding: 0.75rem; text-align: right;">
-                <button type="button" onclick="editPlayer(${index})" class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.85rem; margin-right: 0.5rem;">Edit</button>
-                <button type="button" onclick="deletePlayer(${index})" class="btn-danger" style="padding: 0.25rem 0.75rem; font-size: 0.85rem; background-color: #dc2626; color: white; border: none; border-radius: 0.375rem; cursor: pointer;">Delete</button>
+            <td>${player.name}</td>
+            <td class="text-center"><span class="badge bg-primary">${player.klassierung}</span></td>
+            <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editPlayer(${index})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePlayer(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
             </td>
         `;
         tbody.appendChild(row);
     });
 }
 
-// Modal state
-let editingPlayerIndex = null;
-
-function showAddPlayerModal() {
+function openAddPlayerModal() {
     editingPlayerIndex = null;
     document.getElementById('modalTitle').textContent = 'Add Player';
     document.getElementById('playerName').value = '';
     document.getElementById('playerKlassierung').value = '1';
-    document.getElementById('playerModal').style.display = 'flex';
-    document.getElementById('playerName').focus();
 }
 
 function editPlayer(index) {
     editingPlayerIndex = index;
     const player = currentPlayers[index];
+
     document.getElementById('modalTitle').textContent = 'Edit Player';
     document.getElementById('playerName').value = player.name;
     document.getElementById('playerKlassierung').value = player.klassierung;
-    document.getElementById('playerModal').style.display = 'flex';
-    document.getElementById('playerName').focus();
-}
 
-function closePlayerModal() {
-    document.getElementById('playerModal').style.display = 'none';
-    editingPlayerIndex = null;
+    playerModal.show();
 }
 
 function savePlayer() {
@@ -137,7 +151,7 @@ function savePlayer() {
     }
 
     renderPlayerList();
-    closePlayerModal();
+    playerModal.hide();
 }
 
 function deletePlayer(index) {
@@ -152,68 +166,67 @@ function deletePlayer(index) {
 // Toggle edit mode for an exercise (must be global for onclick to work)
 function toggleEditMode(button) {
     const exerciseIndex = button.getAttribute('data-exercise-index');
-    const exerciseItem = document.querySelector(`.exercise-item[data-exercise-index="${exerciseIndex}"]`);
+    const exerciseCard = document.querySelector(`.exercise-card[data-exercise-index="${exerciseIndex}"]`);
 
-    if (!exerciseItem) {
+    if (!exerciseCard) {
+        console.error('Exercise card not found for index:', exerciseIndex);
         return;
     }
 
-    const pairViews = exerciseItem.querySelectorAll('.pair-view');
-    const pairEdits = exerciseItem.querySelectorAll('.pair-edit');
-    const unpairedView = exerciseItem.querySelector('.unpaired-view');
-    const unpairedEdit = exerciseItem.querySelector('.unpaired-edit');
+    const pairViews = exerciseCard.querySelectorAll('.pair-view');
+    const pairEdits = exerciseCard.querySelectorAll('.pair-edit');
+    const unpairedView = exerciseCard.querySelector('.unpaired-view');
+    const unpairedEdit = exerciseCard.querySelector('.unpaired-edit');
 
-    const isEditing = button.textContent.includes('Save');
+    const isEditing = button.innerHTML.includes('Edit');
 
-    if (isEditing) {
+    if (!isEditing) {
         // Save mode - collect changes and update view
-        pairEdits.forEach((editSpan, index) => {
-            const player1Select = editSpan.querySelector('.player1-select');
-            const player2Select = editSpan.querySelector('.player2-select');
-            const viewSpan = pairViews[index];
+        pairEdits.forEach((editDiv, index) => {
+            const player1Select = editDiv.querySelector('.player1-select');
+            const player2Select = editDiv.querySelector('.player2-select');
+            const viewDiv = pairViews[index];
 
             // Update view with selected values
-            const playerNames = viewSpan.querySelectorAll('.player-name');
-            playerNames[0].textContent = player1Select.value;
-            playerNames[1].textContent = player2Select.value;
+            const playerNames = viewDiv.querySelectorAll('strong');
+            if (playerNames.length >= 2) {
+                playerNames[0].textContent = player1Select.value;
+                playerNames[1].textContent = player2Select.value;
+            }
         });
 
         // Update unpaired player view if it exists
         if (unpairedView && unpairedEdit) {
             const unpairedSelect = unpairedEdit.querySelector('.unpaired-player-select');
-            const unpairedNameSpan = unpairedView.querySelector('.unpaired-player-name');
-            if (unpairedSelect && unpairedNameSpan) {
-                unpairedNameSpan.textContent = unpairedSelect.value;
+            const unpairedSpan = unpairedView.querySelector('span');
+            if (unpairedSelect && unpairedSpan) {
+                unpairedSpan.textContent = unpairedSelect.value;
             }
         }
 
         // Switch back to view mode
-        pairViews.forEach(view => view.style.display = 'inline');
+        pairViews.forEach(view => view.style.display = 'block');
         pairEdits.forEach(edit => edit.style.display = 'none');
         if (unpairedView && unpairedEdit) {
             unpairedView.style.display = 'block';
             unpairedEdit.style.display = 'none';
         }
-        button.textContent = '✏️ Edit';
-        button.classList.remove('btn-save');
-        button.classList.add('btn-edit');
+        button.innerHTML = '<i class="bi bi-pencil"></i> Edit';
     } else {
         // Edit mode - show dropdowns
         pairViews.forEach(view => view.style.display = 'none');
-        pairEdits.forEach(edit => edit.style.display = 'inline');
+        pairEdits.forEach(edit => edit.style.display = 'block');
         if (unpairedView && unpairedEdit) {
             unpairedView.style.display = 'none';
             unpairedEdit.style.display = 'block';
         }
-        button.textContent = '💾 Save';
-        button.classList.remove('btn-edit');
-        button.classList.add('btn-save');
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Save';
 
         // Validate and highlight duplicates/unused players
-        validatePairings(exerciseItem);
+        validatePairings(exerciseCard);
 
         // Initialize previous value for ALL selects for auto-swap
-        const allSelects = exerciseItem.querySelectorAll('.player-select');
+        const allSelects = exerciseCard.querySelectorAll('.player-select');
         allSelects.forEach(select => {
             if (!select.dataset.previousValue) {
                 select.dataset.previousValue = select.value;
@@ -221,57 +234,42 @@ function toggleEditMode(button) {
         });
 
         // Check if listeners are already attached to avoid duplicates
-        if (exerciseItem.dataset.listenersAttached === 'true') {
-            console.log('Listeners already attached, skipping attachment');
+        if (exerciseCard.dataset.listenersAttached === 'true') {
             return;
         }
-        console.log('Attaching new event listeners (delegated)');
 
-        // Attach a SINGLE delegated listener to the exercise item
-        exerciseItem.addEventListener('change', (e) => {
+        exerciseCard.dataset.listenersAttached = 'true';
+
+        // Attach a SINGLE delegated listener to the exercise card
+        exerciseCard.addEventListener('change', (e) => {
             // Handle all player select changes
             if (e.target.classList.contains('player-select')) {
-                console.log('Delegated change event caught - VERSION 3');
-
                 const newPlayer = e.target.value;
                 const oldPlayer = e.target.dataset.previousValue;
 
-                console.log(`Auto-swap triggered: "${oldPlayer}" → "${newPlayer}"`);
-
                 if (oldPlayer) {
-                    // Find where the new player is currently selected (in other pairs or unpaired)
-                    // and replace them with the old player
-                    const otherSelects = Array.from(exerciseItem.querySelectorAll('.player-select')).filter(s => s !== e.target);
+                    // Find where the new player is currently selected and swap
+                    const otherSelects = Array.from(exerciseCard.querySelectorAll('.player-select')).filter(s => s !== e.target);
 
-                    let swapped = false;
                     otherSelects.forEach(select => {
                         if (select.value === newPlayer) {
-                            console.log(`  Found match! Replacing "${newPlayer}" with "${oldPlayer}"`);
                             select.value = oldPlayer;
-                            // Also update the previousValue of the OTHER select so it doesn't trigger a swap back if we change it later
                             select.dataset.previousValue = oldPlayer;
-                            swapped = true;
                         }
                     });
-
-                    if (!swapped) {
-                        console.log('  No match found elsewhere (player might be unused)');
-                    }
-                } else {
-                    console.warn('oldPlayer value is missing, skipping swap');
                 }
-
-                // Update the previous value for next change
-                e.target.dataset.previousValue = newPlayer;
-
-                // Generic validation (runs for ALL player selects)
-                console.log('Running validation');
-                validatePairings(exerciseItem);
             }
+
+            // Update the previous value for next change
+            e.target.dataset.previousValue = newPlayer;
+
+            // Generic validation (runs for ALL player selects)
+            console.log('Running validation');
+            validatePairings(exerciseCard);
         });
 
         // Mark as attached
-        exerciseItem.dataset.listenersAttached = 'true';
+        exerciseCard.dataset.listenersAttached = 'true';
     }
 }
 
