@@ -95,8 +95,8 @@ function savePlayer() {
         return;
     }
 
-    if (isNaN(klassierung) || klassierung < 0 || klassierung > 12) {
-        alert('Invalid Klassierung. Must be between 0 and 12.');
+    if (isNaN(klassierung) || klassierung < 1 || klassierung > 21) {
+        alert('Invalid Klassierung. Must be between 1 and 21.');
         return;
     }
 
