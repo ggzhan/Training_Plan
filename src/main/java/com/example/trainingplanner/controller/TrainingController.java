@@ -32,13 +32,32 @@ public class TrainingController {
         return "index";
     }
 
+    @GetMapping("/api/players")
+    @ResponseBody
+    public List<Player> getPlayersForDate(@RequestParam("date") String date) {
+        return csvService.readPlayersForDate(date);
+    }
+
     @PostMapping("/generate-plan")
     public String generatePlan(@RequestParam("trainingDate") String trainingDate,
             @RequestParam(value = "numberOfExercises", defaultValue = "6") int numberOfExercises,
+            @RequestParam(value = "playersJson", required = false) String playersJson,
             Model model) {
         try {
-            // Pass numberOfExercises to the service
-            TrainingSession session = trainingPlanService.generatePlan(0, trainingDate, null, numberOfExercises);
+            List<Player> players;
+            if (playersJson != null && !playersJson.isEmpty()) {
+                // Parse JSON from frontend
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                players = mapper.readValue(playersJson,
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Player>>() {
+                        });
+            } else {
+                // Fallback to reading from CSV
+                players = csvService.readPlayersForDate(trainingDate);
+            }
+
+            // Pass players to the service
+            TrainingSession session = trainingPlanService.generatePlan(players, numberOfExercises);
             model.addAttribute("trainingPlan", session);
             return "plan";
         } catch (Exception e) {

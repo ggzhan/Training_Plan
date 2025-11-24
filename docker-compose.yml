@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  training-planner:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    restart: unless-stopped
+    volumes:
+      # Mount CSV file to allow updates without rebuilding
+      - ./Einteilung.csv:/app/Einteilung.csv:ro

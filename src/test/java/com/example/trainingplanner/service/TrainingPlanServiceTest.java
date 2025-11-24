@@ -34,11 +34,11 @@ class TrainingPlanServiceTest {
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(90, "22. November", null, 6);
+        TrainingSession session = trainingPlanService.generatePlan(players, 6);
 
         // Verify
         assertNotNull(session);
-        assertEquals(45, session.getTotalDuration());
+        assertEquals(90, session.getTotalDuration());
         // Number of exercises depends on stubbed exercises (3 * 15 = 45 < 90, so all 3
         // should be selected)
         assertTrue(session.getExercises().size() > 0);
@@ -61,7 +61,7 @@ class TrainingPlanServiceTest {
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(60, "22. November", null, 6);
+        TrainingSession session = trainingPlanService.generatePlan(players, 6);
 
         // Verify
         assertNotNull(session);

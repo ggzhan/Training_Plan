@@ -12,6 +12,7 @@ public class TrainingSession {
     private Map<Exercise, List<PlayerPair>> exercisePairs;
     private Map<Exercise, Player> unpairedPlayers;
     private Map<Exercise, Integer> exerciseDiffSums; // Sum of Klassierung differences for each exercise
+    private List<Player> availablePlayers; // All players available for this session
 
     public TrainingSession() {
     }
@@ -72,6 +73,14 @@ public class TrainingSession {
         this.exerciseDiffSums = exerciseDiffSums;
     }
 
+    public List<Player> getAvailablePlayers() {
+        return availablePlayers;
+    }
+
+    public void setAvailablePlayers(List<Player> availablePlayers) {
+        this.availablePlayers = availablePlayers;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -91,7 +100,7 @@ public class TrainingSession {
     @Override
     public int hashCode() {
         return Objects.hash(totalDuration, playerCount, notes, exercises, exercisePairs, unpairedPlayers,
-                exerciseDiffSums);
+                exerciseDiffSums, availablePlayers);
     }
 
     @Override
@@ -104,6 +113,7 @@ public class TrainingSession {
                 ", exercisePairs=" + exercisePairs +
                 ", unpairedPlayers=" + unpairedPlayers +
                 ", exerciseDiffSums=" + exerciseDiffSums +
+                ", availablePlayers=" + availablePlayers +
                 '}';
     }
 }

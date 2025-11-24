@@ -127,18 +127,9 @@ public class TrainingPlanService {
         return result;
     }
 
-    public TrainingSession generatePlan(int totalTimeMinutes, String trainingDate, String manualUnpairedPlayerName,
-            int numberOfExercises)
+    public TrainingSession generatePlan(List<Player> availablePlayers, int numberOfExercises)
             throws Exception {
-        // Get players for the specific date
-        List<Player> availablePlayers = csvService.readPlayersForDate(trainingDate);
-
-        // Filter out manual unpaired player if specified
-        if (manualUnpairedPlayerName != null && !manualUnpairedPlayerName.isEmpty()) {
-            availablePlayers = availablePlayers.stream()
-                    .filter(p -> !p.getName().equals(manualUnpairedPlayerName))
-                    .collect(Collectors.toList());
-        }
+        // Use the provided list of players directly
 
         // Generate custom number of generic exercises
         List<Exercise> selectedExercises = new ArrayList<>();
@@ -212,6 +203,7 @@ public class TrainingPlanService {
 
         session.setExercisePairs(exercisePairs);
         session.setUnpairedPlayers(unpairedPlayers);
+        session.setAvailablePlayers(availablePlayers);
 
         return session;
     }
