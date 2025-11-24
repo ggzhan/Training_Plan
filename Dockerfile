@@ -23,9 +23,6 @@ WORKDIR /app
 # Copy the JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Copy the CSV file (required for player data)
-COPY Einteilung.csv .
-
 # Expose port 8080
 EXPOSE 8080
 

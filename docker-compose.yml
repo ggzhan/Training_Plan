@@ -8,6 +8,3 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
     restart: unless-stopped
-    volumes:
-      # Mount CSV file to allow updates without rebuilding
-      - ./Einteilung.csv:/app/Einteilung.csv:ro
