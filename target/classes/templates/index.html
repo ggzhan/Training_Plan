@@ -77,11 +77,11 @@
             <div class="card-header gradient-bg">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="mb-1"><i class="bi bi-calendar-check"></i> Training Planner</h1>
-                        <p class="mb-0 opacity-75">Design your perfect training session</p>
+                        <h1 class="mb-1"><i class="bi bi-calendar-check"></i> Trainingsplaner</h1>
+                        <p class="mb-0 opacity-75">Automatisch Trainingseinteilung generieren</p>
                     </div>
                     <button type="button" onclick="refreshData()" id="refreshBtn" class="btn btn-light">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                        <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
                     </button>
                 </div>
             </div>
@@ -95,17 +95,17 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label for="trainingDate" class="form-label fw-bold">
-                                <i class="bi bi-calendar3"></i> Training Date
+                                <i class="bi bi-calendar3"></i> Trainingsdatum
                             </label>
                             <select id="trainingDate" name="trainingDate" class="form-select" required>
                                 <option th:each="date : ${trainingDates}" th:value="${date}" th:text="${date}"
-                                    th:selected="${date == defaultDate}">Date</option>
+                                    th:selected="${date == defaultDate}">Datum</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
                             <label for="numberOfExercises" class="form-label fw-bold">
-                                <i class="bi bi-list-ol"></i> Number of Exercises
+                                <i class="bi bi-list-ol"></i> Anzahl der Übungen
                             </label>
                             <input type="number" id="numberOfExercises" name="numberOfExercises" class="form-control"
                                 min="1" max="10" value="6" required>
@@ -120,12 +120,12 @@
                             <h5 class="mb-0" data-bs-toggle="collapse" data-bs-target="#playerListCollapse"
                                 style="cursor: pointer;">
                                 <i class="bi bi-chevron-down collapse-icon me-2"></i>
-                                <i class="bi bi-people"></i> Players
+                                <i class="bi bi-people"></i> Spieler
                                 <span class="badge gradient-bg" id="playerCount">0</span>
                             </h5>
                             <button type="button" class="btn btn-gradient btn-sm" data-bs-toggle="modal"
                                 data-bs-target="#playerModal" onclick="openAddPlayerModal()">
-                                <i class="bi bi-plus-circle"></i> Add Player
+                                <i class="bi bi-plus-circle"></i> Spieler hinzufügen
                             </button>
                         </div>
 
@@ -136,7 +136,7 @@
                                         <tr>
                                             <th>Name</th>
                                             <th class="text-center">Klassierung</th>
-                                            <th class="text-end">Actions</th>
+                                            <th class="text-end">Aktionen</th>
                                         </tr>
                                     </thead>
                                     <tbody id="playerListBody">
@@ -149,7 +149,7 @@
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-gradient btn-lg">
-                            <i class="bi bi-play-circle"></i> Generate Training Plan
+                            <i class="bi bi-play-circle"></i> Trainingsplan generieren
                         </button>
                     </div>
                 </form>
@@ -162,13 +162,13 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header gradient-bg">
-                    <h5 class="modal-title" id="modalTitle">Add Player</h5>
+                    <h5 class="modal-title" id="modalTitle">Spieler hinzufügen</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="playerName" class="form-label fw-bold">Name</label>
-                        <input type="text" class="form-control" id="playerName" placeholder="Enter player name">
+                        <input type="text" class="form-control" id="playerName" placeholder="Spielername eingeben">
                     </div>
                     <div class="mb-3">
                         <label for="playerKlassierung" class="form-label fw-bold">Klassierung (1-21)</label>
@@ -176,9 +176,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                     <button type="button" class="btn btn-gradient" onclick="savePlayer()">
-                        <i class="bi bi-check-circle"></i> Save
+                        <i class="bi bi-check-circle"></i> Speichern
                     </button>
                 </div>
             </div>

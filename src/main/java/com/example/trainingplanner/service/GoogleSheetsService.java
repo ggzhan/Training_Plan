@@ -17,7 +17,7 @@ import java.util.Map;
 @Service
 public class GoogleSheetsService {
 
-    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/15MG37YcWtmpodP4VPJgoRf3yvSYCbuWAcGp2eczd76E/gviz/tq?tqx=out:json";
+    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/1gbevNRuWtom10K-bJVvTUc9MuD5i6SaH2BdrFoKWw0I/gviz/tq?tqx=out:json";
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 

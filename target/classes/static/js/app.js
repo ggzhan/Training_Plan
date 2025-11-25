@@ -358,7 +358,7 @@ function toggleEditMode(button) {
     const unpairedView = exerciseCard.querySelector('.unpaired-view');
     const unpairedEdit = exerciseCard.querySelector('.unpaired-edit');
 
-    const isEditing = button.innerHTML.includes('Edit');
+    const isEditing = button.innerHTML.includes('Bearbeiten');
 
     if (!isEditing) {
         // Save mode - capture state before making changes
@@ -397,7 +397,7 @@ function toggleEditMode(button) {
             unpairedView.style.display = 'block';
             unpairedEdit.style.display = 'none';
         }
-        button.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+        button.innerHTML = '<i class="bi bi-pencil"></i> Bearbeiten';
 
         // Update undo/redo button states
         updateUndoRedoButtons();
@@ -415,7 +415,7 @@ function toggleEditMode(button) {
             unpairedView.style.display = 'none';
             unpairedEdit.style.display = 'block';
         }
-        button.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Speichern';
 
         // Show regenerate button (unless it's the last exercise)
         const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
@@ -489,7 +489,7 @@ function regenerateRemaining(button) {
     // Show loading state
     button.disabled = true;
     const originalHTML = button.innerHTML;
-    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Regenerating...';
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Wird generiert...';
 
     // Collect current pairings from all exercises
     const currentPairings = {};

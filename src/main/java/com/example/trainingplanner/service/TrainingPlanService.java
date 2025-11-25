@@ -117,12 +117,16 @@ public class TrainingPlanService {
         allRounds.sort(Comparator.comparingInt(r -> r.totalDifference));
 
         // Select the best rounds (up to the number of exercises requested)
+        // If more exercises are requested than unique rounds available, reuse rounds
         System.out.println("\n=== Selecting Best " + exercises.size() + " Rounds ===");
-        for (int i = 0; i < Math.min(exercises.size(), allRounds.size()); i++) {
+        for (int i = 0; i < exercises.size(); i++) {
             Exercise exercise = exercises.get(i);
-            RoundWithScore selectedRound = allRounds.get(i);
+            // Cycle through available rounds if we need more exercises than unique rounds
+            int roundIndex = i % allRounds.size();
+            RoundWithScore selectedRound = allRounds.get(roundIndex);
             result.put(exercise, selectedRound.pairs);
-            System.out.println("Exercise " + (i + 1) + " - Diff Sum: " + selectedRound.totalDifference);
+            System.out.println("Exercise " + (i + 1) + " - Diff Sum: " + selectedRound.totalDifference +
+                    (i >= allRounds.size() ? " (reused)" : ""));
         }
 
         return result;
