@@ -1,3 +1,162 @@
+// ===== UNDO/REDO STATE MANAGEMENT =====
+let historyStack = [];
+let redoStack = [];
+
+// Capture the current state of all exercises
+function captureState() {
+    const allExerciseCards = document.querySelectorAll('.exercise-card');
+    const state = [];
+
+    allExerciseCards.forEach((card, idx) => {
+        const exerciseState = {
+            index: idx,
+            pairs: [],
+            unpairedPlayer: null
+        };
+
+        // Get pairs from view mode (the source of truth)
+        const pairContainers = card.querySelectorAll('[data-pair-index]');
+        pairContainers.forEach(pairContainer => {
+            const viewDiv = pairContainer.querySelector('.pair-view');
+            if (viewDiv) {
+                const playerNames = viewDiv.querySelectorAll('strong');
+                if (playerNames.length >= 2) {
+                    exerciseState.pairs.push({
+                        player1: playerNames[0].textContent.trim(),
+                        player2: playerNames[1].textContent.trim()
+                    });
+                }
+            }
+        });
+
+        // Get unpaired player from view mode
+        const unpairedView = card.querySelector('.unpaired-view span');
+        if (unpairedView) {
+            exerciseState.unpairedPlayer = unpairedView.textContent.trim();
+        }
+
+        state.push(exerciseState);
+    });
+
+    return state;
+}
+
+// Restore a previous state
+function restoreState(state) {
+    if (!state) return;
+
+    console.log('🔄 Restoring state:', state);
+
+    const allExerciseCards = document.querySelectorAll('.exercise-card');
+
+    state.forEach((exerciseState, idx) => {
+        if (idx >= allExerciseCards.length) return;
+
+        const card = allExerciseCards[idx];
+
+        // Update pairs - ensure we update ALL pairs from the saved state
+        const pairContainers = card.querySelectorAll('[data-pair-index]');
+
+        console.log(`  Exercise ${idx + 1}: Saved ${exerciseState.pairs.length} pairs, DOM has ${pairContainers.length} containers`);
+
+        // First, update all pairs from the saved state
+        exerciseState.pairs.forEach((pair, pairIdx) => {
+            if (pairIdx >= pairContainers.length) {
+                console.log(`    ⚠️ Skipping pair ${pairIdx} - no container in DOM`);
+                return; // Skip if DOM doesn't have this pair
+            }
+
+            const pairContainer = pairContainers[pairIdx];
+            const viewDiv = pairContainer.querySelector('.pair-view');
+            const editDiv = pairContainer.querySelector('.pair-edit');
+
+            console.log(`    Pair ${pairIdx}: Restoring ${pair.player1} & ${pair.player2}`);
+
+            // Update view mode
+            if (viewDiv) {
+                const playerNames = viewDiv.querySelectorAll('strong');
+                if (playerNames.length >= 2) {
+                    playerNames[0].textContent = pair.player1;
+                    playerNames[1].textContent = pair.player2;
+                }
+            }
+
+            // Update edit mode selects
+            if (editDiv) {
+                const player1Select = editDiv.querySelector('.player1-select');
+                const player2Select = editDiv.querySelector('.player2-select');
+                if (player1Select) {
+                    player1Select.value = pair.player1;
+                    player1Select.dataset.previousValue = pair.player1;
+                }
+                if (player2Select) {
+                    player2Select.value = pair.player2;
+                    player2Select.dataset.previousValue = pair.player2;
+                }
+            }
+        });
+
+        // Update unpaired player
+        if (exerciseState.unpairedPlayer) {
+            const unpairedView = card.querySelector('.unpaired-view span');
+            const unpairedEdit = card.querySelector('.unpaired-player-select');
+
+            if (unpairedView) {
+                unpairedView.textContent = exerciseState.unpairedPlayer;
+            }
+            if (unpairedEdit) {
+                unpairedEdit.value = exerciseState.unpairedPlayer;
+                unpairedEdit.dataset.previousValue = exerciseState.unpairedPlayer;
+            }
+        }
+    });
+
+    updateUndoRedoButtons();
+}
+
+// Undo the last change
+function undo() {
+    if (historyStack.length === 0) return;
+
+    // Save current state to redo stack
+    const currentState = captureState();
+    redoStack.push(currentState);
+
+    // Restore previous state
+    const previousState = historyStack.pop();
+    restoreState(previousState);
+
+    console.log('Undo performed. History stack size:', historyStack.length);
+}
+
+// Redo the last undone change
+function redo() {
+    if (redoStack.length === 0) return;
+
+    // Save current state to history stack
+    const currentState = captureState();
+    historyStack.push(currentState);
+
+    // Restore next state
+    const nextState = redoStack.pop();
+    restoreState(nextState);
+
+    console.log('Redo performed. Redo stack size:', redoStack.length);
+}
+
+// Update undo/redo button states
+function updateUndoRedoButtons() {
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+
+    if (undoBtn) {
+        undoBtn.disabled = historyStack.length === 0;
+    }
+    if (redoBtn) {
+        redoBtn.disabled = redoStack.length === 0;
+    }
+}
+
 // ===== DATA REFRESH =====
 function refreshData() {
     const btn = document.getElementById('refreshBtn');
@@ -181,7 +340,13 @@ function toggleEditMode(button) {
     const isEditing = button.innerHTML.includes('Edit');
 
     if (!isEditing) {
-        // Save mode - collect changes and update view
+        // Save mode - capture state before making changes
+        const currentState = captureState();
+        historyStack.push(currentState);
+        redoStack = []; // Clear redo stack on new edit
+        console.log('State captured. History stack size:', historyStack.length);
+
+        // Collect changes and update view
         pairEdits.forEach((editDiv, index) => {
             const player1Select = editDiv.querySelector('.player1-select');
             const player2Select = editDiv.querySelector('.player2-select');
@@ -212,6 +377,9 @@ function toggleEditMode(button) {
             unpairedEdit.style.display = 'none';
         }
         button.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+
+        // Update undo/redo button states
+        updateUndoRedoButtons();
 
         // Hide regenerate button
         const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
@@ -292,6 +460,10 @@ function regenerateRemaining(button) {
     const allExerciseCards = document.querySelectorAll('.exercise-card');
 
     console.log('Regenerating exercises after index:', exerciseIndex);
+
+    // NOTE: We do NOT capture state here because it was already captured
+    // when the user clicked Save after editing. Capturing again would
+    // push the wrong state to the history stack.
 
     // Show loading state
     button.disabled = true;
@@ -414,8 +586,14 @@ function regenerateRemaining(button) {
                             if (editDiv) {
                                 const player1Select = editDiv.querySelector('.player1-select');
                                 const player2Select = editDiv.querySelector('.player2-select');
-                                if (player1Select) player1Select.value = pair.player1.name;
-                                if (player2Select) player2Select.value = pair.player2.name;
+                                if (player1Select) {
+                                    player1Select.value = pair.player1.name;
+                                    player1Select.dataset.previousValue = pair.player1.name;
+                                }
+                                if (player2Select) {
+                                    player2Select.value = pair.player2.name;
+                                    player2Select.dataset.previousValue = pair.player2.name;
+                                }
                             }
                         }
                     });
@@ -430,6 +608,7 @@ function regenerateRemaining(button) {
                         }
                         if (unpairedEdit) {
                             unpairedEdit.value = unpairedPlayer.name;
+                            unpairedEdit.dataset.previousValue = unpairedPlayer.name;
                         }
                     }
                 }
@@ -437,6 +616,37 @@ function regenerateRemaining(button) {
 
             // Show success message
             button.innerHTML = '<i class="bi bi-check-circle"></i> Regenerated!';
+
+            // Update undo/redo button states
+            updateUndoRedoButtons();
+
+            // Automatically exit edit mode to prevent accidental state capture
+            const editButton = allExerciseCards[exerciseIndex].querySelector('button[onclick*="toggleEditMode"]');
+            if (editButton && editButton.innerHTML.includes('Save')) {
+                // Click the save button to exit edit mode, but we need to prevent it from capturing state
+                // Instead, manually exit edit mode
+                const exerciseCard = allExerciseCards[exerciseIndex];
+                const pairViews = exerciseCard.querySelectorAll('.pair-view');
+                const pairEdits = exerciseCard.querySelectorAll('.pair-edit');
+                const unpairedView = exerciseCard.querySelector('.unpaired-view');
+                const unpairedEdit = exerciseCard.querySelector('.unpaired-edit');
+
+                // Switch back to view mode
+                pairViews.forEach(view => view.style.display = 'block');
+                pairEdits.forEach(edit => edit.style.display = 'none');
+                if (unpairedView && unpairedEdit) {
+                    unpairedView.style.display = 'block';
+                    unpairedEdit.style.display = 'none';
+                }
+                editButton.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+
+                // Hide regenerate button
+                const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
+                if (regenerateBtn) {
+                    regenerateBtn.style.display = 'none';
+                }
+            }
+
             setTimeout(() => {
                 button.innerHTML = originalHTML;
                 button.disabled = false;
@@ -635,4 +845,21 @@ document.addEventListener('DOMContentLoaded', () => {
             card.style.transform = 'translateY(0)';
         }, 100);
     }
+
+    // Initialize undo/redo button states
+    updateUndoRedoButtons();
+
+    // Add keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+Z or Cmd+Z for undo
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+        }
+        // Ctrl+Y or Cmd+Shift+Z for redo
+        else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+            e.preventDefault();
+            redo();
+        }
+    });
 });
