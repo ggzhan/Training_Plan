@@ -1,0 +1,406 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/usr/share/java/maven/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.example:training-planner >--------------------
+[INFO] Building training-planner 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.2.3:run (default-cli) > test-compile @ training-planner >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ training-planner ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 4 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ training-planner ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ training-planner ---
+[INFO] skip non existing resourceDirectory /home/gxz/Work/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ training-planner ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] <<< spring-boot:3.2.3:run (default-cli) < test-compile @ training-planner <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.2.3:run (default-cli) @ training-planner ---
+[INFO] Attaching agents: []
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.3)
+
+2025-11-25T23:45:14.709+01:00  INFO 123849 --- [training-planner] [           main] c.e.t.TrainingPlannerApplication         : Starting TrainingPlannerApplication using Java 25.0.1 with PID 123849 (/home/gxz/Work/target/classes started by gxz in /home/gxz/Work)
+2025-11-25T23:45:14.720+01:00  INFO 123849 --- [training-planner] [           main] c.e.t.TrainingPlannerApplication         : No active profile set, falling back to 1 default profile: "default"
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.apache.tomcat.jni.Library in an unnamed module (file:/home/gxz/.m2/repository/org/apache/tomcat/embed/tomcat-embed-core/10.1.19/tomcat-embed-core-10.1.19.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2025-11-25T23:45:16.887+01:00  INFO 123849 --- [training-planner] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2025-11-25T23:45:16.946+01:00  INFO 123849 --- [training-planner] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-11-25T23:45:16.948+01:00  INFO 123849 --- [training-planner] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.19]
+2025-11-25T23:45:17.163+01:00  INFO 123849 --- [training-planner] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-11-25T23:45:17.166+01:00  INFO 123849 --- [training-planner] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2282 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+Fetching data from Google Sheets...
+Data refreshed successfully at: 2025-11-25T23:45:18.739560829
+2025-11-25T23:45:18.884+01:00  INFO 123849 --- [training-planner] [           main] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page template: index
+2025-11-25T23:45:19.501+01:00  INFO 123849 --- [training-planner] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path ''
+Scheduled refresh triggered at: 2025-11-25T23:45:19.529407565
+Fetching data from Google Sheets...
+2025-11-25T23:45:19.532+01:00  INFO 123849 --- [training-planner] [           main] c.e.t.TrainingPlannerApplication         : Started TrainingPlannerApplication in 5.585 seconds (process running for 6.167)
+Data refreshed successfully at: 2025-11-25T23:45:19.861596213
+2025-11-25T23:46:18.410+01:00  INFO 123849 --- [training-planner] [nio-8080-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-11-25T23:46:18.411+01:00  INFO 123849 --- [training-planner] [nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-11-25T23:46:18.414+01:00  INFO 123849 --- [training-planner] [nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+  Added player: Arthur Masurel (Klassierung: 12, Availability: X)
+  Added player: Cedric Bindschädler (Klassierung: 1, Availability: X)
+  Added player: Daniel Derek Pigrum (Klassierung: 11, Availability: X)
+  Added player: David Fischlewitz (Klassierung: 9, Availability: X)
+  Added player: David Minh Truong (Klassierung: 2, Availability: X)
+  Added player: Gaëtan Keraudren (Klassierung: 2, Availability: X)
+  Added player: Jakob Distler (Klassierung: 2, Availability: X)
+  Added player: Jannes Waschkies (Klassierung: 5, Availability: X)
+  Added player: Julia Gajewska (Klassierung: 6, Availability: X)
+  Added player: Leonardo Rossi (Klassierung: 2, Availability: X)
+  Added player: Leonie Davis (Klassierung: 3, Availability: X)
+  Added player: Liam Azar (Klassierung: 3, Availability: X)
+  Added player: Lucien Meury (Klassierung: 9, Availability: X)
+  Added player: Lukas Trtik (Klassierung: 2, Availability: X)
+  Added player: Samuel Rupp (Klassierung: 2, Availability: X)
+  Added player: Silas Kuster (Klassierung: 2, Availability: X)
+  Added player: Ved Sambare (Klassierung: 2, Availability: X)
+Loaded 17 players for 20. September
+=== Rotating Unpaired Players (Odd Number) ===
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 6, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 6 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 1 - Unpaired: Samuel Rupp
+Exercise 2 - Unpaired: Silas Kuster
+Exercise 3 - Unpaired: David Minh Truong
+Exercise 4 - Unpaired: Gaëtan Keraudren
+Exercise 5 - Unpaired: Jakob Distler
+Exercise 6 - Unpaired: Jannes Waschkies
+
+=== Regenerating Exercises After Index 0 ===
+  Used pair: Arthur Masurel & Ved Sambare
+  Used pair: Julia Gajewska & Jakob Distler
+  Used pair: Leonardo Rossi & Gaëtan Keraudren
+  Used pair: Leonie Davis & David Minh Truong
+  Used pair: Liam Azar & David Fischlewitz
+  Used pair: Lucien Meury & Daniel Derek Pigrum
+  Used pair: Lukas Trtik & Cedric Bindschädler
+  Used pair: Silas Kuster & Jannes Waschkies
+Total used pairs: 8
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 17, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 17 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 7 - Diff Sum: 31
+Exercise 8 - Diff Sum: 35
+Exercise 9 - Diff Sum: 37
+Exercise 10 - Diff Sum: 37
+Exercise 11 - Diff Sum: 37
+Exercise 12 - Diff Sum: 39
+Exercise 13 - Diff Sum: 39
+Exercise 14 - Diff Sum: 41
+Exercise 15 - Diff Sum: 43
+Exercise 16 - Diff Sum: 43
+Exercise 17 - Diff Sum: 45
+Round (Diff: 21) SKIPPED - contains used pair
+Round (Diff: 23) SKIPPED - contains used pair
+Round (Diff: 25) SKIPPED - contains used pair
+
+Available valid rounds for regeneration: 14
+=== Rotating Unpaired Players (Odd Number) ===
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 6, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 6 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 1 - Unpaired: Samuel Rupp
+Exercise 2 - Unpaired: Silas Kuster
+Exercise 3 - Unpaired: David Minh Truong
+Exercise 4 - Unpaired: Gaëtan Keraudren
+Exercise 5 - Unpaired: Jakob Distler
+Exercise 6 - Unpaired: Jannes Waschkies
+Returning cached players for 20. September
+=== Rotating Unpaired Players (Odd Number) ===
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 6, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 6 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 1 - Unpaired: Samuel Rupp
+Exercise 2 - Unpaired: Silas Kuster
+Exercise 3 - Unpaired: David Minh Truong
+Exercise 4 - Unpaired: Gaëtan Keraudren
+Exercise 5 - Unpaired: Jakob Distler
+Exercise 6 - Unpaired: Jannes Waschkies
+
+=== Regenerating Exercises After Index 0 ===
+  Used pair: Arthur Masurel & Ved Sambare
+  Used pair: Julia Gajewska & Jakob Distler
+  Used pair: Leonardo Rossi & Gaëtan Keraudren
+  Used pair: Leonie Davis & David Minh Truong
+  Used pair: Liam Azar & David Fischlewitz
+  Used pair: Lucien Meury & Daniel Derek Pigrum
+  Used pair: Lukas Trtik & Cedric Bindschädler
+  Used pair: Silas Kuster & Jannes Waschkies
+Total used pairs: 8
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 17, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 17 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 7 - Diff Sum: 31
+Exercise 8 - Diff Sum: 35
+Exercise 9 - Diff Sum: 37
+Exercise 10 - Diff Sum: 37
+Exercise 11 - Diff Sum: 37
+Exercise 12 - Diff Sum: 39
+Exercise 13 - Diff Sum: 39
+Exercise 14 - Diff Sum: 41
+Exercise 15 - Diff Sum: 43
+Exercise 16 - Diff Sum: 43
+Exercise 17 - Diff Sum: 45
+Round (Diff: 21) SKIPPED - contains used pair
+Round (Diff: 23) SKIPPED - contains used pair
+Round (Diff: 25) SKIPPED - contains used pair
+
+Available valid rounds for regeneration: 14
+
+=== Regenerating Exercises After Index 0 ===
+  Used pair: Arthur Masurel & Daniel Derek Pigrum
+  Used pair: Julia Gajewska & Jakob Distler
+  Used pair: Leonardo Rossi & Gaëtan Keraudren
+  Used pair: Leonie Davis & David Minh Truong
+  Used pair: Liam Azar & David Fischlewitz
+  Used pair: Lucien Meury & Ved Sambare
+  Used pair: Lukas Trtik & Cedric Bindschädler
+  Used pair: Silas Kuster & Jannes Waschkies
+Total used pairs: 8
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 17, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 17 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 7 - Diff Sum: 31
+Exercise 8 - Diff Sum: 35
+Exercise 9 - Diff Sum: 37
+Exercise 10 - Diff Sum: 37
+Exercise 11 - Diff Sum: 37
+Exercise 12 - Diff Sum: 39
+Exercise 13 - Diff Sum: 39
+Exercise 14 - Diff Sum: 41
+Exercise 15 - Diff Sum: 43
+Exercise 16 - Diff Sum: 43
+Exercise 17 - Diff Sum: 45
+Round (Diff: 34) SKIPPED - contains used pair
+Round (Diff: 21) SKIPPED - contains used pair
+Round (Diff: 25) SKIPPED - contains used pair
+Round (Diff: 23) SKIPPED - contains used pair
+
+Available valid rounds for regeneration: 13
+
+=== Regenerating Exercises After Index 0 ===
+  Used pair: Arthur Masurel & Daniel Derek Pigrum
+  Used pair: Julia Gajewska & Jakob Distler
+  Used pair: Leonardo Rossi & Gaëtan Keraudren
+  Used pair: Leonie Davis & David Minh Truong
+  Used pair: Lucien Meury & David Fischlewitz
+  Used pair: Liam Azar & Ved Sambare
+  Used pair: Lukas Trtik & Cedric Bindschädler
+  Used pair: Silas Kuster & Jannes Waschkies
+Total used pairs: 8
+=== Klassierung-Optimized Round-Robin Pairing ===
+Exercises: 17, Players: 18
+Round 1 - Total Klassierung Diff: 43
+Round 2 - Total Klassierung Diff: 25
+Round 3 - Total Klassierung Diff: 41
+Round 4 - Total Klassierung Diff: 37
+Round 5 - Total Klassierung Diff: 39
+Round 6 - Total Klassierung Diff: 31
+Round 7 - Total Klassierung Diff: 27
+Round 8 - Total Klassierung Diff: 35
+Round 9 - Total Klassierung Diff: 39
+Round 10 - Total Klassierung Diff: 37
+Round 11 - Total Klassierung Diff: 23
+Round 12 - Total Klassierung Diff: 43
+Round 13 - Total Klassierung Diff: 31
+Round 14 - Total Klassierung Diff: 45
+Round 15 - Total Klassierung Diff: 29
+Round 16 - Total Klassierung Diff: 25
+Round 17 - Total Klassierung Diff: 37
+
+=== Selecting Best 17 Rounds ===
+Exercise 1 - Diff Sum: 23
+Exercise 2 - Diff Sum: 25
+Exercise 3 - Diff Sum: 25
+Exercise 4 - Diff Sum: 27
+Exercise 5 - Diff Sum: 29
+Exercise 6 - Diff Sum: 31
+Exercise 7 - Diff Sum: 31
+Exercise 8 - Diff Sum: 35
+Exercise 9 - Diff Sum: 37
+Exercise 10 - Diff Sum: 37
+Exercise 11 - Diff Sum: 37
+Exercise 12 - Diff Sum: 39
+Exercise 13 - Diff Sum: 39
+Exercise 14 - Diff Sum: 41
+Exercise 15 - Diff Sum: 43
+Exercise 16 - Diff Sum: 43
+Exercise 17 - Diff Sum: 45
+Round (Diff: 28) SKIPPED - contains used pair
+Round (Diff: 21) SKIPPED - contains used pair
+Round (Diff: 23) SKIPPED - contains used pair
+Round (Diff: 25) SKIPPED - contains used pair
+Round (Diff: 23) SKIPPED - contains used pair
+
+Available valid rounds for regeneration: 12
+Returning cached players for 20. September

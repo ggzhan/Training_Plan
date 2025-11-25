@@ -42,6 +42,7 @@ function captureState() {
 }
 
 // Restore a previous state
+// Restore a previous state
 function restoreState(state) {
     if (!state) return;
 
@@ -53,24 +54,37 @@ function restoreState(state) {
         if (idx >= allExerciseCards.length) return;
 
         const card = allExerciseCards[idx];
+        const pairsContainer = card.querySelector('.row.g-2'); // The container for pairs
 
-        // Update pairs - ensure we update ALL pairs from the saved state
-        const pairContainers = card.querySelectorAll('[data-pair-index]');
+        if (!pairsContainer) return;
 
-        console.log(`  Exercise ${idx + 1}: Saved ${exerciseState.pairs.length} pairs, DOM has ${pairContainers.length} containers`);
+        // Get a template for the pair card
+        // We try to use the first child of the current container
+        // If the container is empty (unlikely in this app flow), we might fail to render new pairs
+        // But since we start with populated exercises, this should be safe.
+        let pairTemplate = pairsContainer.firstElementChild;
 
-        // First, update all pairs from the saved state
+        // If current container is empty, try to find a template from another exercise
+        if (!pairTemplate) {
+            const otherCard = document.querySelector('.exercise-card .row.g-2 > div');
+            if (otherCard) pairTemplate = otherCard;
+        }
+
+        if (!pairTemplate) {
+            console.error('Cannot restore state: No pair template found');
+            return;
+        }
+
+        // Clear the container to remove all existing pairs (prevents duplicates)
+        pairsContainer.innerHTML = '';
+
+        // Rebuild pairs from state
         exerciseState.pairs.forEach((pair, pairIdx) => {
-            if (pairIdx >= pairContainers.length) {
-                console.log(`    ⚠️ Skipping pair ${pairIdx} - no container in DOM`);
-                return; // Skip if DOM doesn't have this pair
-            }
+            const newPair = pairTemplate.cloneNode(true);
+            newPair.dataset.pairIndex = pairIdx;
 
-            const pairContainer = pairContainers[pairIdx];
-            const viewDiv = pairContainer.querySelector('.pair-view');
-            const editDiv = pairContainer.querySelector('.pair-edit');
-
-            console.log(`    Pair ${pairIdx}: Restoring ${pair.player1} & ${pair.player2}`);
+            const viewDiv = newPair.querySelector('.pair-view');
+            const editDiv = newPair.querySelector('.pair-edit');
 
             // Update view mode
             if (viewDiv) {
@@ -85,6 +99,9 @@ function restoreState(state) {
             if (editDiv) {
                 const player1Select = editDiv.querySelector('.player1-select');
                 const player2Select = editDiv.querySelector('.player2-select');
+
+                // We need to ensure the selects have the correct value
+                // The options are cloned from the template, so they should be correct
                 if (player1Select) {
                     player1Select.value = pair.player1;
                     player1Select.dataset.previousValue = pair.player1;
@@ -94,7 +111,11 @@ function restoreState(state) {
                     player2Select.dataset.previousValue = pair.player2;
                 }
             }
+
+            pairsContainer.appendChild(newPair);
         });
+
+        console.log(`  Exercise ${idx + 1}: Restored ${exerciseState.pairs.length} pairs`);
 
         // Update unpaired player
         if (exerciseState.unpairedPlayer) {
@@ -526,14 +547,31 @@ function regenerateRemaining(button) {
     const firstSelect = firstExercise.querySelector('.player-select');
     if (firstSelect) {
         const options = firstSelect.querySelectorAll('option');
+        const seenPlayers = new Set();
+
         options.forEach(option => {
-            const playerName = option.value;
-            // Try to get klassierung from the player badge or default to 1
-            availablePlayers.push({
-                name: playerName,
-                klassierung: 1 // We'll use a default since we don't have easy access to klassierung
-            });
+            const playerName = option.value.trim();
+
+            // Deduplicate players
+            if (playerName && !seenPlayers.has(playerName)) {
+                seenPlayers.add(playerName);
+
+                // Parse Klassierung from text: "Name (K)"
+                let klassierung = 1;
+                const text = option.textContent;
+                const match = text.match(/\((\d+)\)$/);
+                if (match) {
+                    klassierung = parseInt(match[1]);
+                }
+
+                availablePlayers.push({
+                    name: playerName,
+                    klassierung: klassierung
+                });
+            }
         });
+
+        console.log('Collected available players:', availablePlayers.length);
     }
 
     // Build request
@@ -556,97 +594,47 @@ function regenerateRemaining(button) {
     })
         .then(response => response.json())
         .then(data => {
-            console.log('Regeneration response:', data);
+            // Check for duplicates in response (debug only if needed)
+            // Object.keys(data.exercisePairs).forEach(key => {
+            //     const pairs = data.exercisePairs[key];
+            //     const names = new Set();
+            //     pairs.forEach(p => {
+            //         if (names.has(p.player1.name)) console.error(`DUPLICATE PLAYER IN RESPONSE (${key}):`, p.player1.name);
+            //         names.add(p.player1.name);
+            //         if (names.has(p.player2.name)) console.error(`DUPLICATE PLAYER IN RESPONSE (${key}):`, p.player2.name);
+            //         names.add(p.player2.name);
+            //     });
+            // });
 
-            // Update exercises after the edited index
-            data.exercises.forEach((exercise, idx) => {
-                if (idx > exerciseIndex) {
-                    const card = allExerciseCards[idx];
-                    const pairs = data.exercisePairs[exercise.name];
-                    const unpairedPlayer = data.unpairedPlayers[exercise.name];
+            // Construct new state object from response
+            const newState = {
+                exercises: data.exercises.map(ex => {
+                    const pairs = data.exercisePairs[ex.name] || [];
+                    const unpaired = data.unpairedPlayers[ex.name];
 
-                    // Update pairs in view mode
-                    const pairContainers = card.querySelectorAll('[data-pair-index]');
-                    pairContainers.forEach((pairContainer, pairIdx) => {
-                        if (pairs && pairs[pairIdx]) {
-                            const pair = pairs[pairIdx];
-                            const viewDiv = pairContainer.querySelector('.pair-view');
-                            const editDiv = pairContainer.querySelector('.pair-edit');
+                    return {
+                        name: ex.name,
+                        pairs: pairs.map(p => ({
+                            player1: p.player1.name,
+                            player2: p.player2.name
+                        })),
+                        unpairedPlayer: unpaired ? unpaired.name : null
+                    };
+                })
+            };
 
-                            // Update view
-                            if (viewDiv) {
-                                const playerNames = viewDiv.querySelectorAll('strong');
-                                if (playerNames.length >= 2) {
-                                    playerNames[0].textContent = pair.player1.name;
-                                    playerNames[1].textContent = pair.player2.name;
-                                }
-                            }
+            // Use restoreState to update the DOM and handle history
+            // This ensures complete cleanup of old DOM elements (preventing stale duplicates)
+            restoreState(newState.exercises);
 
-                            // Update edit selects
-                            if (editDiv) {
-                                const player1Select = editDiv.querySelector('.player1-select');
-                                const player2Select = editDiv.querySelector('.player2-select');
-                                if (player1Select) {
-                                    player1Select.value = pair.player1.name;
-                                    player1Select.dataset.previousValue = pair.player1.name;
-                                }
-                                if (player2Select) {
-                                    player2Select.value = pair.player2.name;
-                                    player2Select.dataset.previousValue = pair.player2.name;
-                                }
-                            }
-                        }
-                    });
-
-                    // Update unpaired player
-                    if (unpairedPlayer) {
-                        const unpairedView = card.querySelector('.unpaired-view span');
-                        const unpairedEdit = card.querySelector('.unpaired-player-select');
-
-                        if (unpairedView) {
-                            unpairedView.textContent = unpairedPlayer.name;
-                        }
-                        if (unpairedEdit) {
-                            unpairedEdit.value = unpairedPlayer.name;
-                            unpairedEdit.dataset.previousValue = unpairedPlayer.name;
-                        }
-                    }
-                }
-            });
-
-            // Show success message
-            button.innerHTML = '<i class="bi bi-check-circle"></i> Regenerated!';
-
-            // Update undo/redo button states
+            // Since this is a new action, clear the redo stack
+            redoStack = [];
             updateUndoRedoButtons();
 
-            // Automatically exit edit mode to prevent accidental state capture
-            const editButton = allExerciseCards[exerciseIndex].querySelector('button[onclick*="toggleEditMode"]');
-            if (editButton && editButton.innerHTML.includes('Save')) {
-                // Click the save button to exit edit mode, but we need to prevent it from capturing state
-                // Instead, manually exit edit mode
-                const exerciseCard = allExerciseCards[exerciseIndex];
-                const pairViews = exerciseCard.querySelectorAll('.pair-view');
-                const pairEdits = exerciseCard.querySelectorAll('.pair-edit');
-                const unpairedView = exerciseCard.querySelector('.unpaired-view');
-                const unpairedEdit = exerciseCard.querySelector('.unpaired-edit');
+            // Show success message
+            console.log('Regeneration complete.');
 
-                // Switch back to view mode
-                pairViews.forEach(view => view.style.display = 'block');
-                pairEdits.forEach(edit => edit.style.display = 'none');
-                if (unpairedView && unpairedEdit) {
-                    unpairedView.style.display = 'block';
-                    unpairedEdit.style.display = 'none';
-                }
-                editButton.innerHTML = '<i class="bi bi-pencil"></i> Edit';
-
-                // Hide regenerate button
-                const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
-                if (regenerateBtn) {
-                    regenerateBtn.style.display = 'none';
-                }
-            }
-
+            // Reset button state after a short delay
             setTimeout(() => {
                 button.innerHTML = originalHTML;
                 button.disabled = false;
@@ -654,6 +642,7 @@ function regenerateRemaining(button) {
         })
         .catch(error => {
             console.error('Error regenerating exercises:', error);
+            alert('Regeneration failed: ' + error.message + '. Check console for details.');
             button.innerHTML = '<i class="bi bi-x-circle"></i> Error';
             setTimeout(() => {
                 button.innerHTML = originalHTML;

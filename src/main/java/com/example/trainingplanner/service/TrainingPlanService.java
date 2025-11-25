@@ -245,76 +245,115 @@ public class TrainingPlanService {
 
         // Generate all possible rounds
         int numPlayers = availablePlayers.size();
+        List<RoundWithScoreRegen> allRounds = new ArrayList<>(); // Changed to RoundWithScoreRegen
+        // Map<Exercise, Player> roundUnpairedPlayers = new HashMap<>(); // This map is
+        // no longer needed as unpairedPlayer is in RoundWithScoreRegen
+
         if (numPlayers % 2 != 0) {
-            numPlayers--; // Work with even number for round-robin
-        }
+            // Odd number of players - use Dummy Player strategy
+            List<Player> allPlayersWithDummy = new ArrayList<>(availablePlayers);
+            Player dummyPlayer = new Player("DUMMY", 0);
+            allPlayersWithDummy.add(dummyPlayer);
 
-        List<Player> evenPlayers = availablePlayers.subList(0, numPlayers);
-        int totalRounds = numPlayers - 1;
-        List<RoundWithScore> allRounds = new ArrayList<>();
-
-        // Create a mutable list for rotation
-        List<Player> rotatingPlayers = new ArrayList<>(evenPlayers.subList(1, numPlayers));
-
-        for (int round = 0; round < totalRounds; round++) {
-            List<PlayerPair> pairs = new ArrayList<>();
-            int totalDiff = 0;
-            boolean hasUsedPair = false;
-
-            // Player 0 (fixed) pairs with the last player in the rotating list
-            Player p1 = evenPlayers.get(0);
-            Player p2 = rotatingPlayers.get(rotatingPlayers.size() - 1);
-            String pairKey = getPairKeyFromNames(p1.getName(), p2.getName());
-
-            if (usedPairKeys.contains(pairKey)) {
-                hasUsedPair = true;
+            // Generate rounds for N+1 players
+            // We need a list of exercises for generateRoundRobinPairings,
+            // but here we just need to generate all possible rounds, so we can pass a dummy
+            // list.
+            List<Exercise> dummyExercises = new ArrayList<>();
+            for (int i = 0; i < numPlayers; i++) { // N-1 rounds for N players, so N dummy exercises
+                dummyExercises.add(new Exercise("DummyEx" + i, "", "Generic", 0));
             }
-            pairs.add(new PlayerPair(p1, p2));
-            totalDiff += Math.abs(p1.getKlassierung() - p2.getKlassierung());
 
-            // Other players pair up
-            for (int i = 0; i < rotatingPlayers.size() / 2; i++) {
-                Player player1 = rotatingPlayers.get(i);
-                Player player2 = rotatingPlayers.get(rotatingPlayers.size() - 2 - i);
-                String key = getPairKeyFromNames(player1.getName(), player2.getName());
+            Map<Exercise, List<PlayerPair>> roundsWithDummy = generateRoundRobinPairings(dummyExercises,
+                    allPlayersWithDummy);
 
-                if (usedPairKeys.contains(key)) {
-                    hasUsedPair = true;
+            // Process each round to find the unpaired player (partner of DUMMY)
+            // Since generateRoundRobinPairings returns a Map keyed by Exercise (which is
+            // just used as an index/placeholder there),
+            // we iterate through the values.
+            for (Map.Entry<Exercise, List<PlayerPair>> entry : roundsWithDummy.entrySet()) {
+                List<PlayerPair> pairs = entry.getValue();
+                List<PlayerPair> realPairs = new ArrayList<>();
+                Player unpaired = null;
+
+                for (PlayerPair pair : pairs) {
+                    if (pair.getPlayer1().getName().equals("DUMMY")) {
+                        unpaired = pair.getPlayer2();
+                    } else if (pair.getPlayer2().getName().equals("DUMMY")) {
+                        unpaired = pair.getPlayer1();
+                    } else {
+                        realPairs.add(pair);
+                    }
                 }
-                pairs.add(new PlayerPair(player1, player2));
-                totalDiff += Math.abs(player1.getKlassierung() - player2.getKlassierung());
+
+                if (unpaired != null) {
+                    // Calculate score for this round (sum of diffs)
+                    int roundScore = 0;
+                    for (PlayerPair p : realPairs) {
+                        roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
+                    }
+                    allRounds.add(new RoundWithScoreRegen(realPairs, roundScore, unpaired));
+                }
             }
 
-            // Only add rounds that don't contain any used pairs
-            if (!hasUsedPair) {
-                allRounds.add(new RoundWithScore(pairs, totalDiff));
-                System.out.println("Round " + (round + 1) + " - Diff: " + totalDiff + " (available)");
-            } else {
-                System.out
-                        .println("Round " + (round + 1) + " - Diff: " + totalDiff + " (SKIPPED - contains used pair)");
+        } else {
+            // Even number of players - standard round robin
+            // We need a list of exercises for generateRoundRobinPairings,
+            // but here we just need to generate all possible rounds, so we can pass a dummy
+            // list.
+            List<Exercise> dummyExercises = new ArrayList<>();
+            for (int i = 0; i < numPlayers - 1; i++) { // N-1 rounds for N players
+                dummyExercises.add(new Exercise("DummyEx" + i, "", "Generic", 0));
             }
-
-            // Rotate players for the next round
-            if (rotatingPlayers.size() > 1) {
-                Player lastPlayer = rotatingPlayers.remove(rotatingPlayers.size() - 1);
-                rotatingPlayers.add(0, lastPlayer);
+            Map<Exercise, List<PlayerPair>> rounds = generateRoundRobinPairings(dummyExercises, availablePlayers);
+            for (List<PlayerPair> pairs : rounds.values()) {
+                int roundScore = 0;
+                for (PlayerPair p : pairs) {
+                    roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
+                }
+                allRounds.add(new RoundWithScoreRegen(pairs, roundScore, null));
             }
         }
 
-        // Sort available rounds by total difference
-        allRounds.sort(Comparator.comparingInt(r -> r.totalDifference));
+        // Filter out rounds that contain pairs already used in previous exercises
+        List<RoundWithScoreRegen> validRounds = new ArrayList<>();
+        for (RoundWithScoreRegen round : allRounds) {
+            boolean roundHasUsedPair = false;
+            for (PlayerPair pair : round.pairs) {
+                String pairKey = getPairKeyFromNames(pair.getPlayer1().getName(), pair.getPlayer2().getName());
+                if (usedPairKeys.contains(pairKey)) {
+                    roundHasUsedPair = true;
+                    break;
+                }
+            }
+            if (!roundHasUsedPair) {
+                validRounds.add(round);
+            } else {
+                System.out.println("Round (Diff: " + round.score + ") SKIPPED - contains used pair");
+            }
+        }
 
-        System.out.println("\nAvailable rounds for regeneration: " + allRounds.size());
+        // If we don't have enough valid rounds, we might need to relax the constraint
+        // or reuse rounds.
+        // For now, let's just use what we have, and if we run out, we cycle.
+        if (validRounds.isEmpty()) {
+            System.out.println("WARNING: No valid unique rounds found! Reusing all rounds.");
+            validRounds.addAll(allRounds); // If no valid rounds, fall back to all generated rounds (even if they
+                                           // contain used pairs)
+        }
+
+        // Sort rounds by score (lower is better balance)
+        validRounds.sort(Comparator.comparingInt(r -> r.score));
+
+        System.out.println("\nAvailable valid rounds for regeneration: " + validRounds.size());
 
         // Build the result using String keys
         Map<String, List<PlayerPair>> exercisePairs = new HashMap<>();
         Map<String, Player> unpairedPlayers = new HashMap<>();
 
-        // Keep manually edited exercises (0 to editedIndex)
+        // 1. Keep manually edited exercises (0 to editedIndex)
         for (int i = 0; i <= editedIndex; i++) {
             String exerciseKey = "Exercise " + (i + 1);
-
-            // Reconstruct pairs from DTO
             List<RegenerateRequest.PairDto> pairDtos = request.getCurrentPairings().get(exerciseKey);
             if (pairDtos != null) {
                 List<PlayerPair> pairs = new ArrayList<>();
@@ -338,31 +377,24 @@ public class TrainingPlanService {
             }
         }
 
-        // Generate new pairings for remaining exercises
-        int remainingExercises = totalExercises - editedIndex - 1;
-        System.out.println("\nGenerating " + remainingExercises + " new exercises...");
-
-        for (int i = 0; i < remainingExercises && i < allRounds.size(); i++) {
+        // 2. Add regenerated exercises
+        int roundsNeeded = totalExercises - editedIndex - 1;
+        for (int i = 0; i < roundsNeeded; i++) {
             String exerciseKey = "Exercise " + (editedIndex + 2 + i);
-            RoundWithScore selectedRound = allRounds.get(i);
-            exercisePairs.put(exerciseKey, selectedRound.pairs);
-            System.out.println("Exercise " + (editedIndex + 2 + i) + " - Diff Sum: " + selectedRound.totalDifference);
-
-            // Restore unpaired player for this exercise
-            String unpairedName = request.getUnpairedPlayers().get(exerciseKey);
-            if (unpairedName != null) {
-                Player unpaired = findPlayerByName(availablePlayers, unpairedName);
-                if (unpaired != null) {
-                    unpairedPlayers.put(exerciseKey, unpaired);
+            // Use modulo to cycle if we don't have enough unique rounds
+            if (!validRounds.isEmpty()) {
+                RoundWithScoreRegen round = validRounds.get(i % validRounds.size());
+                exercisePairs.put(exerciseKey, round.pairs);
+                if (round.unpairedPlayer != null) {
+                    unpairedPlayers.put(exerciseKey, round.unpairedPlayer);
                 }
             }
         }
 
-        // Build response DTO
         com.example.trainingplanner.dto.RegenerateResponse response = new com.example.trainingplanner.dto.RegenerateResponse();
         List<com.example.trainingplanner.dto.RegenerateResponse.ExerciseDto> exerciseDtos = new ArrayList<>();
-        for (int i = 0; i < totalExercises; i++) {
-            exerciseDtos.add(new com.example.trainingplanner.dto.RegenerateResponse.ExerciseDto("Exercise " + (i + 1)));
+        for (com.example.trainingplanner.model.Exercise ex : allExercises) {
+            exerciseDtos.add(new com.example.trainingplanner.dto.RegenerateResponse.ExerciseDto(ex.getName()));
         }
         response.setExercises(exerciseDtos);
         response.setExercisePairs(exercisePairs);
@@ -380,5 +412,18 @@ public class TrainingPlanService {
                 .filter(p -> p.getName().equals(name))
                 .findFirst()
                 .orElse(null);
+    }
+
+    // Helper class for regeneration
+    private static class RoundWithScoreRegen {
+        List<PlayerPair> pairs;
+        int score;
+        Player unpairedPlayer;
+
+        public RoundWithScoreRegen(List<PlayerPair> pairs, int score, Player unpairedPlayer) {
+            this.pairs = pairs;
+            this.score = score;
+            this.unpairedPlayer = unpairedPlayer;
+        }
     }
 }

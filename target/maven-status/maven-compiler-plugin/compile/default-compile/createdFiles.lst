@@ -1,4 +1,5 @@
 com/example/trainingplanner/dto/RegenerateResponse.class
+com/example/trainingplanner/service/TrainingPlanService$RoundWithScoreRegen.class
 com/example/trainingplanner/service/GoogleSheetsService.class
 com/example/trainingplanner/model/Exercise.class
 com/example/trainingplanner/dto/RegenerateRequest$PairDto.class
