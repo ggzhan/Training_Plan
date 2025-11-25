@@ -2,8 +2,10 @@
 /home/gxz/Work/src/main/java/com/example/trainingplanner/service/GoogleSheetsService.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/Player.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/TrainingPlannerApplication.java
+/home/gxz/Work/src/main/java/com/example/trainingplanner/dto/RegenerateResponse.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/controller/TrainingController.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/service/TrainingPlanService.java
+/home/gxz/Work/src/main/java/com/example/trainingplanner/dto/RegenerateRequest.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/TrainingSession.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/model/Exercise.java
 /home/gxz/Work/src/main/java/com/example/trainingplanner/service/CsvService.java

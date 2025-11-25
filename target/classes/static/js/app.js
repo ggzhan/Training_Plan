@@ -212,6 +212,12 @@ function toggleEditMode(button) {
             unpairedEdit.style.display = 'none';
         }
         button.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+
+        // Hide regenerate button
+        const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
+        if (regenerateBtn) {
+            regenerateBtn.style.display = 'none';
+        }
     } else {
         // Edit mode - show dropdowns
         pairViews.forEach(view => view.style.display = 'none');
@@ -221,6 +227,12 @@ function toggleEditMode(button) {
             unpairedEdit.style.display = 'block';
         }
         button.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+
+        // Show regenerate button (unless it's the last exercise)
+        const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
+        if (regenerateBtn && regenerateBtn.getAttribute('data-is-last') !== 'true') {
+            regenerateBtn.style.display = 'inline-block';
+        }
 
         // Validate and highlight duplicates/unused players
         validatePairings(exerciseCard);
@@ -247,30 +259,197 @@ function toggleEditMode(button) {
                 const newPlayer = e.target.value;
                 const oldPlayer = e.target.dataset.previousValue;
 
-                if (oldPlayer) {
+                if (oldPlayer && oldPlayer !== newPlayer) {
                     // Find where the new player is currently selected and swap
                     const otherSelects = Array.from(exerciseCard.querySelectorAll('.player-select')).filter(s => s !== e.target);
 
                     otherSelects.forEach(select => {
                         if (select.value === newPlayer) {
+                            // Swap: put the old player where the new player was
                             select.value = oldPlayer;
+                            // CRITICAL: Update the previousValue of the OTHER select too
                             select.dataset.previousValue = oldPlayer;
                         }
                     });
                 }
+
+                // Update the previous value for THIS select for next change
+                e.target.dataset.previousValue = newPlayer;
+
+                // Run validation after swap
+                validatePairings(exerciseCard);
             }
-
-            // Update the previous value for next change
-            e.target.dataset.previousValue = newPlayer;
-
-            // Generic validation (runs for ALL player selects)
-            console.log('Running validation');
-            validatePairings(exerciseCard);
         });
 
         // Mark as attached
         exerciseCard.dataset.listenersAttached = 'true';
     }
+}
+
+// Regenerate remaining exercises after manual edits
+function regenerateRemaining(button) {
+    const exerciseIndex = parseInt(button.getAttribute('data-exercise-index'));
+    const allExerciseCards = document.querySelectorAll('.exercise-card');
+
+    console.log('Regenerating exercises after index:', exerciseIndex);
+
+    // Show loading state
+    button.disabled = true;
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Regenerating...';
+
+    // Collect current pairings from all exercises
+    const currentPairings = {};
+    const unpairedPlayers = {};
+    const availablePlayers = [];
+
+    allExerciseCards.forEach((card, idx) => {
+        const exerciseKey = `Exercise ${idx + 1}`;
+        const pairs = [];
+
+        // Get pairs from edit mode (if in edit mode) or view mode
+        const pairContainers = card.querySelectorAll('[data-pair-index]');
+        pairContainers.forEach(pairContainer => {
+            const editDiv = pairContainer.querySelector('.pair-edit');
+            const viewDiv = pairContainer.querySelector('.pair-view');
+
+            let player1Name, player2Name;
+
+            if (editDiv && editDiv.style.display !== 'none') {
+                // In edit mode - get from selects
+                player1Name = editDiv.querySelector('.player1-select').value;
+                player2Name = editDiv.querySelector('.player2-select').value;
+            } else if (viewDiv) {
+                // In view mode - get from text
+                const playerNames = viewDiv.querySelectorAll('strong');
+                if (playerNames.length >= 2) {
+                    player1Name = playerNames[0].textContent.trim();
+                    player2Name = playerNames[1].textContent.trim();
+                }
+            }
+
+            if (player1Name && player2Name) {
+                pairs.push({
+                    player1Name: player1Name,
+                    player2Name: player2Name
+                });
+            }
+        });
+
+        currentPairings[exerciseKey] = pairs;
+
+        // Get unpaired player
+        const unpairedView = card.querySelector('.unpaired-view span');
+        const unpairedEdit = card.querySelector('.unpaired-player-select');
+
+        if (unpairedEdit && unpairedEdit.parentElement.style.display !== 'none') {
+            unpairedPlayers[exerciseKey] = unpairedEdit.value;
+        } else if (unpairedView) {
+            unpairedPlayers[exerciseKey] = unpairedView.textContent.trim();
+        }
+    });
+
+    // Get available players from the first exercise's dropdowns
+    const firstExercise = allExerciseCards[0];
+    const firstSelect = firstExercise.querySelector('.player-select');
+    if (firstSelect) {
+        const options = firstSelect.querySelectorAll('option');
+        options.forEach(option => {
+            const playerName = option.value;
+            // Try to get klassierung from the player badge or default to 1
+            availablePlayers.push({
+                name: playerName,
+                klassierung: 1 // We'll use a default since we don't have easy access to klassierung
+            });
+        });
+    }
+
+    // Build request
+    const request = {
+        exerciseIndex: exerciseIndex,
+        currentPairings: currentPairings,
+        unpairedPlayers: unpairedPlayers,
+        availablePlayers: availablePlayers
+    };
+
+    console.log('Regenerate request:', request);
+
+    // Call backend API
+    fetch('/api/regenerate-exercises', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Regeneration response:', data);
+
+            // Update exercises after the edited index
+            data.exercises.forEach((exercise, idx) => {
+                if (idx > exerciseIndex) {
+                    const card = allExerciseCards[idx];
+                    const pairs = data.exercisePairs[exercise.name];
+                    const unpairedPlayer = data.unpairedPlayers[exercise.name];
+
+                    // Update pairs in view mode
+                    const pairContainers = card.querySelectorAll('[data-pair-index]');
+                    pairContainers.forEach((pairContainer, pairIdx) => {
+                        if (pairs && pairs[pairIdx]) {
+                            const pair = pairs[pairIdx];
+                            const viewDiv = pairContainer.querySelector('.pair-view');
+                            const editDiv = pairContainer.querySelector('.pair-edit');
+
+                            // Update view
+                            if (viewDiv) {
+                                const playerNames = viewDiv.querySelectorAll('strong');
+                                if (playerNames.length >= 2) {
+                                    playerNames[0].textContent = pair.player1.name;
+                                    playerNames[1].textContent = pair.player2.name;
+                                }
+                            }
+
+                            // Update edit selects
+                            if (editDiv) {
+                                const player1Select = editDiv.querySelector('.player1-select');
+                                const player2Select = editDiv.querySelector('.player2-select');
+                                if (player1Select) player1Select.value = pair.player1.name;
+                                if (player2Select) player2Select.value = pair.player2.name;
+                            }
+                        }
+                    });
+
+                    // Update unpaired player
+                    if (unpairedPlayer) {
+                        const unpairedView = card.querySelector('.unpaired-view span');
+                        const unpairedEdit = card.querySelector('.unpaired-player-select');
+
+                        if (unpairedView) {
+                            unpairedView.textContent = unpairedPlayer.name;
+                        }
+                        if (unpairedEdit) {
+                            unpairedEdit.value = unpairedPlayer.name;
+                        }
+                    }
+                }
+            });
+
+            // Show success message
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Regenerated!';
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }, 2000);
+        })
+        .catch(error => {
+            console.error('Error regenerating exercises:', error);
+            button.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }, 2000);
+        });
 }
 
 // Validate pairings and highlight duplicates and unused players

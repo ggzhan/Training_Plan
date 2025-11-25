@@ -1,5 +1,6 @@
 package com.example.trainingplanner.controller;
 
+import com.example.trainingplanner.dto.RegenerateRequest;
 import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.TrainingSession;
 import com.example.trainingplanner.service.GoogleSheetsService;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -75,5 +77,12 @@ public class TrainingController {
             model.addAttribute("error", "Error generating plan: " + e.getMessage());
             return "index";
         }
+    }
+
+    @PostMapping("/api/regenerate-exercises")
+    @ResponseBody
+    public com.example.trainingplanner.dto.RegenerateResponse regenerateExercises(
+            @RequestBody RegenerateRequest request) {
+        return trainingPlanService.regenerateRemainingExercises(request);
     }
 }
