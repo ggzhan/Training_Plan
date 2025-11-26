@@ -381,16 +381,50 @@ public class TrainingPlanService {
             }
         }
 
-        // 2. Add regenerated exercises
+        // Track which players are already unpaired in manually edited exercises
+        Set<String> usedUnpairedPlayerNames = new HashSet<>();
+        for (int i = 0; i <= editedIndex; i++) {
+            String exerciseKey = "Exercise " + (i + 1);
+            String unpairedName = request.getUnpairedPlayers().get(exerciseKey);
+            if (unpairedName != null) {
+                usedUnpairedPlayerNames.add(unpairedName);
+            }
+        }
+
+        // 2. Add regenerated exercises, ensuring no duplicate unpaired players
         int roundsNeeded = totalExercises - editedIndex - 1;
+        int roundIndex = 0;
         for (int i = 0; i < roundsNeeded; i++) {
             String exerciseKey = "Exercise " + (editedIndex + 2 + i);
-            // Use modulo to cycle if we don't have enough unique rounds
-            if (!validRounds.isEmpty()) {
-                RoundWithScoreRegen round = validRounds.get(i % validRounds.size());
-                exercisePairs.put(exerciseKey, round.pairs);
-                if (round.unpairedPlayer != null) {
-                    unpairedPlayers.put(exerciseKey, round.unpairedPlayer);
+
+            // Find a round where the unpaired player hasn't been used yet
+            RoundWithScoreRegen selectedRound = null;
+            int attempts = 0;
+            while (selectedRound == null && attempts < validRounds.size()) {
+                RoundWithScoreRegen candidate = validRounds.get(roundIndex % validRounds.size());
+                roundIndex++;
+                attempts++;
+
+                // Check if this round's unpaired player is already used
+                if (candidate.unpairedPlayer == null ||
+                        !usedUnpairedPlayerNames.contains(candidate.unpairedPlayer.getName())) {
+                    selectedRound = candidate;
+                    if (candidate.unpairedPlayer != null) {
+                        usedUnpairedPlayerNames.add(candidate.unpairedPlayer.getName());
+                    }
+                }
+            }
+
+            // If we couldn't find a round with unique unpaired player, use the best
+            // available
+            if (selectedRound == null && !validRounds.isEmpty()) {
+                selectedRound = validRounds.get(i % validRounds.size());
+            }
+
+            if (selectedRound != null) {
+                exercisePairs.put(exerciseKey, selectedRound.pairs);
+                if (selectedRound.unpairedPlayer != null) {
+                    unpairedPlayers.put(exerciseKey, selectedRound.unpairedPlayer);
                 }
             }
         }
