@@ -8,7 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -83,7 +86,48 @@ public class GoogleSheetsService {
 
     public String getNextTrainingDate() {
         List<String> dates = getTrainingDates();
-        return dates.isEmpty() ? null : dates.get(0);
+        if (dates.isEmpty()) {
+            return null;
+        }
+
+        // Get today's date
+        LocalDate today = LocalDate.now();
+        int currentYear = today.getYear();
+
+        // Format: "d. MMMM" (e.g., "20. September" or "1. November") with German month
+        // names
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d. MMMM", java.util.Locale.GERMAN);
+
+        String closestDate = dates.get(0);
+        long minDifference = Long.MAX_VALUE;
+
+        for (String dateStr : dates) {
+            try {
+                // Parse the date string (format: "d. MMMM")
+                // We need to add a year to parse it properly
+                LocalDate trainingDate = LocalDate.parse(dateStr + " " + currentYear,
+                        DateTimeFormatter.ofPattern("d. MMMM yyyy", java.util.Locale.GERMAN));
+
+                // If the date is in the past, assume it's for next year
+                if (trainingDate.isBefore(today)) {
+                    trainingDate = trainingDate.plusYears(1);
+                }
+
+                // Calculate absolute difference in days
+                long difference = Math.abs(ChronoUnit.DAYS.between(today, trainingDate));
+
+                // Update if this date is closer
+                if (difference < minDifference) {
+                    minDifference = difference;
+                    closestDate = dateStr;
+                }
+            } catch (Exception e) {
+                // If parsing fails, skip this date
+                System.err.println("Failed to parse date: " + dateStr + " - " + e.getMessage());
+            }
+        }
+
+        return closestDate;
     }
 
     public List<Player> readPlayersForDate(String targetDate) {
