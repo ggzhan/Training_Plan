@@ -132,7 +132,16 @@ public class TrainingPlanService {
         return result;
     }
 
-    public TrainingSession generatePlan(List<Player> availablePlayers, int numberOfExercises)
+    // Backward compatible overload for existing tests
+    // If the number of players is odd, default to 1 unpaired player to preserve
+    // previous behavior
+    public TrainingSession generatePlan(List<Player> availablePlayers, int numberOfExercises) throws Exception {
+        int defaultUnpaired = (availablePlayers.size() % 2 == 0) ? 0 : 1;
+        return generatePlan(availablePlayers, numberOfExercises, defaultUnpaired);
+    }
+
+    public TrainingSession generatePlan(List<Player> availablePlayers, int numberOfExercises,
+            int numberOfUnpairedPlayers)
             throws Exception {
         // Use the provided list of players directly
 
@@ -155,54 +164,65 @@ public class TrainingPlanService {
         session.setPlayerCount(availablePlayers.size());
         session.setNotes("Generated plan with " + selectedExercises.size() + " exercises.");
 
-        Map<Exercise, Player> unpairedPlayers = new HashMap<>();
+        Map<Exercise, List<Player>> unpairedPlayers = new HashMap<>();
 
         // Generate pairings with unique pairs across all exercises
         Map<Exercise, List<PlayerPair>> exercisePairs;
 
-        if (availablePlayers.size() % 2 != 0) {
-            // Odd number of players - rotate who sits out each exercise
-            System.out.println("=== Rotating Unpaired Players (Odd Number) ===");
+        if (numberOfUnpairedPlayers > 0) {
+            // Add N dummy players to create unpaired slots
+            System.out.println("=== Rotating Unpaired Players (N=" + numberOfUnpairedPlayers + ") ===");
 
-            // First, generate pairings as if we have all players (we'll filter later)
-            // We need to add a dummy player to make it even for round-robin
-            List<Player> allPlayersWithDummy = new ArrayList<>(availablePlayers);
-            Player dummyPlayer = new Player("DUMMY", 0);
-            allPlayersWithDummy.add(dummyPlayer);
+            // Add N DUMMY players to make pairing work
+            List<Player> allPlayersWithDummies = new ArrayList<>(availablePlayers);
+            for (int i = 0; i < numberOfUnpairedPlayers; i++) {
+                Player dummyPlayer = new Player("DUMMY" + i, 0);
+                allPlayersWithDummies.add(dummyPlayer);
+            }
 
-            // Generate round-robin pairings with the dummy player
+            // Generate round-robin pairings with the dummy players
             Map<Exercise, List<PlayerPair>> allPairings = generateRoundRobinPairings(selectedExercises,
-                    allPlayersWithDummy);
+                    allPlayersWithDummies);
 
-            // Now for each exercise, find which real player is paired with the dummy
-            // That player becomes the unpaired player for that exercise
+            // Now for each exercise, find which real players are paired with dummy players
+            // Those players become the unpaired players for that exercise
             exercisePairs = new HashMap<>();
             for (Exercise exercise : selectedExercises) {
                 List<PlayerPair> pairs = allPairings.get(exercise);
                 if (pairs != null) {
                     List<PlayerPair> realPairs = new ArrayList<>();
-                    Player unpairedPlayer = null;
+                    List<Player> exerciseUnpairedPlayers = new ArrayList<>();
 
                     for (PlayerPair pair : pairs) {
-                        if (pair.getPlayer1().getName().equals("DUMMY")) {
+                        boolean isDummyPair = false;
+                        Player unpairedPlayer = null;
+
+                        if (pair.getPlayer1().getName().startsWith("DUMMY")) {
                             unpairedPlayer = pair.getPlayer2();
-                        } else if (pair.getPlayer2().getName().equals("DUMMY")) {
+                            isDummyPair = true;
+                        } else if (pair.getPlayer2().getName().startsWith("DUMMY")) {
                             unpairedPlayer = pair.getPlayer1();
+                            isDummyPair = true;
+                        }
+
+                        if (isDummyPair) {
+                            exerciseUnpairedPlayers.add(unpairedPlayer);
                         } else {
                             realPairs.add(pair);
                         }
                     }
 
                     exercisePairs.put(exercise, realPairs);
-                    if (unpairedPlayer != null) {
-                        unpairedPlayers.put(exercise, unpairedPlayer);
+                    if (!exerciseUnpairedPlayers.isEmpty()) {
+                        unpairedPlayers.put(exercise, exerciseUnpairedPlayers);
                         System.out.println("Exercise " + (selectedExercises.indexOf(exercise) + 1) + " - Unpaired: "
-                                + unpairedPlayer.getName());
+                                + exerciseUnpairedPlayers.stream().map(Player::getName)
+                                        .collect(Collectors.joining(", ")));
                     }
                 }
             }
         } else {
-            // Even number - all players participate in all exercises
+            // No unpaired players - all players participate in all exercises
             exercisePairs = generateRoundRobinPairings(selectedExercises, availablePlayers);
         }
 
@@ -247,57 +267,67 @@ public class TrainingPlanService {
 
         System.out.println("Total used pairs: " + usedPairKeys.size());
 
+        // Determine number of unpaired players from the first exercise
+        int numberOfUnpairedPlayers = 0;
+        String firstExerciseKey = "Exercise 1";
+        List<String> firstExerciseUnpaired = request.getUnpairedPlayers().get(firstExerciseKey);
+        if (firstExerciseUnpaired != null) {
+            numberOfUnpairedPlayers = firstExerciseUnpaired.size();
+        }
+
         // Generate all possible rounds
         int numPlayers = availablePlayers.size();
-        List<RoundWithScoreRegen> allRounds = new ArrayList<>(); // Changed to RoundWithScoreRegen
-        // Map<Exercise, Player> roundUnpairedPlayers = new HashMap<>(); // This map is
-        // no longer needed as unpairedPlayer is in RoundWithScoreRegen
+        List<RoundWithScoreRegen> allRounds = new ArrayList<>();
 
-        if (numPlayers % 2 != 0) {
-            // Odd number of players - use Dummy Player strategy
-            List<Player> allPlayersWithDummy = new ArrayList<>(availablePlayers);
-            Player dummyPlayer = new Player("DUMMY", 0);
-            allPlayersWithDummy.add(dummyPlayer);
+        if (numberOfUnpairedPlayers > 0) {
+            // Use N Dummy Players strategy
+            List<Player> allPlayersWithDummies = new ArrayList<>(availablePlayers);
+            for (int i = 0; i < numberOfUnpairedPlayers; i++) {
+                Player dummyPlayer = new Player("DUMMY" + i, 0);
+                allPlayersWithDummies.add(dummyPlayer);
+            }
 
-            // Generate rounds for N+1 players
-            // We need a list of exercises for generateRoundRobinPairings,
-            // but here we just need to generate all possible rounds, so we can pass a dummy
-            // list.
+            // Generate rounds for N+numberOfUnpairedPlayers players
             List<Exercise> dummyExercises = new ArrayList<>();
-            for (int i = 0; i < numPlayers; i++) { // N-1 rounds for N players, so N dummy exercises
+            int totalWithDummies = numPlayers + numberOfUnpairedPlayers;
+            for (int i = 0; i < totalWithDummies - 1; i++) {
                 dummyExercises.add(new Exercise("DummyEx" + i, "", "Generic", 0));
             }
 
-            Map<Exercise, List<PlayerPair>> roundsWithDummy = generateRoundRobinPairings(dummyExercises,
-                    allPlayersWithDummy);
+            Map<Exercise, List<PlayerPair>> roundsWithDummies = generateRoundRobinPairings(dummyExercises,
+                    allPlayersWithDummies);
 
-            // Process each round to find the unpaired player (partner of DUMMY)
-            // Since generateRoundRobinPairings returns a Map keyed by Exercise (which is
-            // just used as an index/placeholder there),
-            // we iterate through the values.
-            for (Map.Entry<Exercise, List<PlayerPair>> entry : roundsWithDummy.entrySet()) {
+            // Process each round to find the unpaired players (partners of DUMMY players)
+            for (Map.Entry<Exercise, List<PlayerPair>> entry : roundsWithDummies.entrySet()) {
                 List<PlayerPair> pairs = entry.getValue();
                 List<PlayerPair> realPairs = new ArrayList<>();
-                Player unpaired = null;
+                List<Player> roundUnpaired = new ArrayList<>();
 
                 for (PlayerPair pair : pairs) {
-                    if (pair.getPlayer1().getName().equals("DUMMY")) {
-                        unpaired = pair.getPlayer2();
-                    } else if (pair.getPlayer2().getName().equals("DUMMY")) {
-                        unpaired = pair.getPlayer1();
+                    boolean isDummyPair = false;
+                    Player unpairedPlayer = null;
+
+                    if (pair.getPlayer1().getName().startsWith("DUMMY")) {
+                        unpairedPlayer = pair.getPlayer2();
+                        isDummyPair = true;
+                    } else if (pair.getPlayer2().getName().startsWith("DUMMY")) {
+                        unpairedPlayer = pair.getPlayer1();
+                        isDummyPair = true;
+                    }
+
+                    if (isDummyPair) {
+                        roundUnpaired.add(unpairedPlayer);
                     } else {
                         realPairs.add(pair);
                     }
                 }
 
-                if (unpaired != null) {
-                    // Calculate score for this round (sum of diffs)
-                    int roundScore = 0;
-                    for (PlayerPair p : realPairs) {
-                        roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
-                    }
-                    allRounds.add(new RoundWithScoreRegen(realPairs, roundScore, unpaired));
+                // Calculate score for this round (sum of diffs)
+                int roundScore = 0;
+                for (PlayerPair p : realPairs) {
+                    roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
                 }
+                allRounds.add(new RoundWithScoreRegen(realPairs, roundScore, roundUnpaired));
             }
 
         } else {
@@ -315,7 +345,7 @@ public class TrainingPlanService {
                 for (PlayerPair p : pairs) {
                     roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
                 }
-                allRounds.add(new RoundWithScoreRegen(pairs, roundScore, null));
+                allRounds.add(new RoundWithScoreRegen(pairs, roundScore, new ArrayList<>()));
             }
         }
 
@@ -353,7 +383,7 @@ public class TrainingPlanService {
 
         // Build the result using String keys
         Map<String, List<PlayerPair>> exercisePairs = new HashMap<>();
-        Map<String, Player> unpairedPlayers = new HashMap<>();
+        Map<String, List<Player>> unpairedPlayers = new HashMap<>();
 
         // 1. Keep manually edited exercises (0 to editedIndex)
         for (int i = 0; i <= editedIndex; i++) {
@@ -371,12 +401,18 @@ public class TrainingPlanService {
                 exercisePairs.put(exerciseKey, pairs);
             }
 
-            // Restore unpaired player
-            String unpairedName = request.getUnpairedPlayers().get(exerciseKey);
-            if (unpairedName != null) {
-                Player unpaired = findPlayerByName(availablePlayers, unpairedName);
-                if (unpaired != null) {
-                    unpairedPlayers.put(exerciseKey, unpaired);
+            // Restore unpaired players
+            List<String> unpairedNames = request.getUnpairedPlayers().get(exerciseKey);
+            if (unpairedNames != null && !unpairedNames.isEmpty()) {
+                List<Player> exerciseUnpaired = new ArrayList<>();
+                for (String name : unpairedNames) {
+                    Player unpaired = findPlayerByName(availablePlayers, name);
+                    if (unpaired != null) {
+                        exerciseUnpaired.add(unpaired);
+                    }
+                }
+                if (!exerciseUnpaired.isEmpty()) {
+                    unpairedPlayers.put(exerciseKey, exerciseUnpaired);
                 }
             }
         }
@@ -389,8 +425,8 @@ public class TrainingPlanService {
             if (!validRounds.isEmpty()) {
                 RoundWithScoreRegen round = validRounds.get(i % validRounds.size());
                 exercisePairs.put(exerciseKey, round.pairs);
-                if (round.unpairedPlayer != null) {
-                    unpairedPlayers.put(exerciseKey, round.unpairedPlayer);
+                if (round.unpairedPlayers != null && !round.unpairedPlayers.isEmpty()) {
+                    unpairedPlayers.put(exerciseKey, round.unpairedPlayers);
                 }
             }
         }
@@ -422,12 +458,12 @@ public class TrainingPlanService {
     private static class RoundWithScoreRegen {
         List<PlayerPair> pairs;
         int score;
-        Player unpairedPlayer;
+        List<Player> unpairedPlayers;
 
-        public RoundWithScoreRegen(List<PlayerPair> pairs, int score, Player unpairedPlayer) {
+        public RoundWithScoreRegen(List<PlayerPair> pairs, int score, List<Player> unpairedPlayers) {
             this.pairs = pairs;
             this.score = score;
-            this.unpairedPlayer = unpairedPlayer;
+            this.unpairedPlayers = unpairedPlayers;
         }
     }
 }

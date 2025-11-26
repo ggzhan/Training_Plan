@@ -11,7 +11,7 @@ function captureState() {
         const exerciseState = {
             index: idx,
             pairs: [],
-            unpairedPlayer: null
+            unpairedPlayers: []
         };
 
         // Get pairs from view mode (the source of truth)
@@ -29,10 +29,16 @@ function captureState() {
             }
         });
 
-        // Get unpaired player from view mode
-        const unpairedView = card.querySelector('.unpaired-view span');
+        // Get unpaired players from view mode
+        const unpairedView = card.querySelector('.unpaired-view');
         if (unpairedView) {
-            exerciseState.unpairedPlayer = unpairedView.textContent.trim();
+            const unpairedSpans = unpairedView.querySelectorAll('span span');
+            unpairedSpans.forEach(span => {
+                const playerName = span.textContent.trim();
+                if (playerName && playerName !== ',') {
+                    exerciseState.unpairedPlayers.push(playerName);
+                }
+            });
         }
 
         state.push(exerciseState);
@@ -117,17 +123,45 @@ function restoreState(state) {
 
         console.log(`  Exercise ${idx + 1}: Restored ${exerciseState.pairs.length} pairs`);
 
-        // Update unpaired player
-        if (exerciseState.unpairedPlayer) {
-            const unpairedView = card.querySelector('.unpaired-view span');
-            const unpairedEdit = card.querySelector('.unpaired-player-select');
-
+        // Update unpaired players
+        const unpairedContainer = card.querySelector('.unpaired-players-container');
+        if (exerciseState.unpairedPlayers && exerciseState.unpairedPlayers.length > 0) {
+            // Update view mode
+            const unpairedView = card.querySelector('.unpaired-view');
             if (unpairedView) {
-                unpairedView.textContent = exerciseState.unpairedPlayer;
+                const unpairedSpansContainer = unpairedView.querySelector('span');
+                if (unpairedSpansContainer) {
+                    unpairedSpansContainer.innerHTML = exerciseState.unpairedPlayers.map((name, idx) =>
+                        `<span>${name}</span>${idx < exerciseState.unpairedPlayers.length - 1 ? '<span>, </span>' : ''}`
+                    ).join('');
+                }
             }
-            if (unpairedEdit) {
-                unpairedEdit.value = exerciseState.unpairedPlayer;
-                unpairedEdit.dataset.previousValue = exerciseState.unpairedPlayer;
+
+            // Update edit mode
+            if (unpairedContainer) {
+                unpairedContainer.innerHTML = '';
+                exerciseState.unpairedPlayers.forEach(playerName => {
+                    const selectDiv = document.createElement('div');
+                    selectDiv.className = 'mb-2';
+                    const select = document.createElement('select');
+                    select.className = 'form-select player-select unpaired-player-select';
+
+                    // Get options from first select in the exercise
+                    const firstSelect = card.querySelector('.player-select');
+                    if (firstSelect) {
+                        Array.from(firstSelect.options).forEach(option => {
+                            const newOption = option.cloneNode(true);
+                            if (option.value === playerName) {
+                                newOption.selected = true;
+                            }
+                            select.appendChild(newOption);
+                        });
+                    }
+
+                    select.dataset.previousValue = playerName;
+                    selectDiv.appendChild(select);
+                    unpairedContainer.appendChild(selectDiv);
+                });
             }
         }
     });
@@ -381,12 +415,19 @@ function toggleEditMode(button) {
             }
         });
 
-        // Update unpaired player view if it exists
+        // Update unpaired players view if they exist
         if (unpairedView && unpairedEdit) {
-            const unpairedSelect = unpairedEdit.querySelector('.unpaired-player-select');
-            const unpairedSpan = unpairedView.querySelector('span');
-            if (unpairedSelect && unpairedSpan) {
-                unpairedSpan.textContent = unpairedSelect.value;
+            const unpairedSelects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+            const unpairedSpansContainer = unpairedView.querySelector('span');
+            if (unpairedSelects.length > 0 && unpairedSpansContainer) {
+                const names = Array.from(unpairedSelects)
+                    .map(s => s.value)
+                    .filter(name => name && name !== ',');
+                // Deduplicate names
+                const uniqueNames = [...new Set(names)];
+                unpairedSpansContainer.innerHTML = uniqueNames.map((name, idx) =>
+                    `<span>${name}</span>${idx < uniqueNames.length - 1 ? '<span>, </span>' : ''}`
+                ).join('');
             }
         }
 
@@ -426,21 +467,6 @@ function toggleEditMode(button) {
         // Validate and highlight duplicates/unused players
         validatePairings(exerciseCard);
 
-        // Initialize previous value for ALL selects for auto-swap
-        const allSelects = exerciseCard.querySelectorAll('.player-select');
-        allSelects.forEach(select => {
-            if (!select.dataset.previousValue) {
-                select.dataset.previousValue = select.value;
-            }
-        });
-
-        // Check if listeners are already attached to avoid duplicates
-        if (exerciseCard.dataset.listenersAttached === 'true') {
-            return;
-        }
-
-        exerciseCard.dataset.listenersAttached = 'true';
-
         // Attach a SINGLE delegated listener to the exercise card
         exerciseCard.addEventListener('change', (e) => {
             // Handle all player select changes
@@ -469,9 +495,6 @@ function toggleEditMode(button) {
                 validatePairings(exerciseCard);
             }
         });
-
-        // Mark as attached
-        exerciseCard.dataset.listenersAttached = 'true';
     }
 }
 
@@ -531,16 +554,35 @@ function regenerateRemaining(button) {
 
         currentPairings[exerciseKey] = pairs;
 
-        // Get unpaired player
-        const unpairedView = card.querySelector('.unpaired-view span');
-        const unpairedEdit = card.querySelector('.unpaired-player-select');
+        // Get unpaired players (now as an array)
+        const unpairedView = card.querySelector('.unpaired-view');
+        const unpairedEditContainer = card.querySelector('.unpaired-players-container');
+        const exerciseUnpaired = [];
 
-        if (unpairedEdit && unpairedEdit.parentElement.style.display !== 'none') {
-            unpairedPlayers[exerciseKey] = unpairedEdit.value;
+        if (unpairedEditContainer && unpairedEditContainer.parentElement.style.display !== 'none') {
+            // In edit mode - get from selects
+            const unpairedSelects = unpairedEditContainer.querySelectorAll('.unpaired-player-select');
+            unpairedSelects.forEach(select => {
+                if (select.value) {
+                    exerciseUnpaired.push(select.value);
+                }
+            });
         } else if (unpairedView) {
-            unpairedPlayers[exerciseKey] = unpairedView.textContent.trim();
+            // In view mode - parse from text
+            const unpairedSpans = unpairedView.querySelectorAll('span span');
+            unpairedSpans.forEach(span => {
+                const playerName = span.textContent.trim();
+                if (playerName && playerName !== ',') {
+                    exerciseUnpaired.push(playerName);
+                }
+            });
+        }
+
+        if (exerciseUnpaired.length > 0) {
+            unpairedPlayers[exerciseKey] = exerciseUnpaired;
         }
     });
+
 
     // Get available players from the first exercise's dropdowns
     const firstExercise = allExerciseCards[0];

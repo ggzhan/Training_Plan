@@ -11,7 +11,7 @@ import java.util.Map;
 public class RegenerateResponse {
     private List<ExerciseDto> exercises;
     private Map<String, List<PlayerPair>> exercisePairs;
-    private Map<String, Player> unpairedPlayers;
+    private Map<String, List<Player>> unpairedPlayers;
 
     public RegenerateResponse() {
     }
@@ -32,11 +32,11 @@ public class RegenerateResponse {
         this.exercisePairs = exercisePairs;
     }
 
-    public Map<String, Player> getUnpairedPlayers() {
+    public Map<String, List<Player>> getUnpairedPlayers() {
         return unpairedPlayers;
     }
 
-    public void setUnpairedPlayers(Map<String, Player> unpairedPlayers) {
+    public void setUnpairedPlayers(Map<String, List<Player>> unpairedPlayers) {
         this.unpairedPlayers = unpairedPlayers;
     }
 
