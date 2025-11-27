@@ -29,10 +29,14 @@ function captureState() {
             }
         });
 
-        // Get unpaired player from view mode
-        const unpairedView = card.querySelector('.unpaired-view span');
+        // Get unpaired players from view mode
+        const unpairedView = card.querySelector('.unpaired-view');
+        exerciseState.unpairedPlayers = [];
         if (unpairedView) {
-            exerciseState.unpairedPlayer = unpairedView.textContent.trim();
+            const spans = unpairedView.querySelectorAll('span > span:first-child'); // Select the name spans
+            spans.forEach(span => {
+                exerciseState.unpairedPlayers.push(span.textContent.trim());
+            });
         }
 
         state.push(exerciseState);
@@ -117,17 +121,32 @@ function restoreState(state) {
 
         console.log(`  Exercise ${idx + 1}: Restored ${exerciseState.pairs.length} pairs`);
 
-        // Update unpaired player
-        if (exerciseState.unpairedPlayer) {
-            const unpairedView = card.querySelector('.unpaired-view span');
-            const unpairedEdit = card.querySelector('.unpaired-player-select');
+        // Update unpaired players
+        if (exerciseState.unpairedPlayers && exerciseState.unpairedPlayers.length > 0) {
+            const unpairedView = card.querySelector('.unpaired-view');
+            const unpairedEdit = card.querySelector('.unpaired-edit');
 
             if (unpairedView) {
-                unpairedView.textContent = exerciseState.unpairedPlayer;
+                // Rebuild view list
+                unpairedView.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Ohne Partner:</strong>
+                `;
+                exerciseState.unpairedPlayers.forEach((player, i) => {
+                    const span = document.createElement('span');
+                    span.innerHTML = `<span class="text-dark">${player}</span>${i < exerciseState.unpairedPlayers.length - 1 ? ', ' : ''}`;
+                    unpairedView.appendChild(span);
+                });
             }
+
             if (unpairedEdit) {
-                unpairedEdit.value = exerciseState.unpairedPlayer;
-                unpairedEdit.dataset.previousValue = exerciseState.unpairedPlayer;
+                const selects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+                selects.forEach((select, i) => {
+                    if (i < exerciseState.unpairedPlayers.length) {
+                        select.value = exerciseState.unpairedPlayers[i];
+                        select.dataset.previousValue = exerciseState.unpairedPlayers[i];
+                    }
+                });
             }
         }
     });
@@ -383,11 +402,19 @@ function toggleEditMode(button) {
 
         // Update unpaired player view if it exists
         if (unpairedView && unpairedEdit) {
-            const unpairedSelect = unpairedEdit.querySelector('.unpaired-player-select');
-            const unpairedSpan = unpairedView.querySelector('span');
-            if (unpairedSelect && unpairedSpan) {
-                unpairedSpan.textContent = unpairedSelect.value;
-            }
+            const unpairedSelects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+
+            // Rebuild view content
+            unpairedView.innerHTML = `
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Ohne Partner:</strong>
+            `;
+
+            unpairedSelects.forEach((select, i) => {
+                const span = document.createElement('span');
+                span.innerHTML = `<span>${select.value}</span>${i < unpairedSelects.length - 1 ? ', ' : ''}`;
+                unpairedView.appendChild(span);
+            });
         }
 
         // Switch back to view mode
@@ -532,13 +559,22 @@ function regenerateRemaining(button) {
         currentPairings[exerciseKey] = pairs;
 
         // Get unpaired player
-        const unpairedView = card.querySelector('.unpaired-view span');
-        const unpairedEdit = card.querySelector('.unpaired-player-select');
+        // Get unpaired players
+        const unpairedView = card.querySelector('.unpaired-view');
+        const unpairedEdit = card.querySelector('.unpaired-edit');
 
-        if (unpairedEdit && unpairedEdit.parentElement.style.display !== 'none') {
-            unpairedPlayers[exerciseKey] = unpairedEdit.value;
+        const unpairedList = [];
+
+        if (unpairedEdit && unpairedEdit.style.display !== 'none') {
+            const selects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+            selects.forEach(select => unpairedList.push(select.value));
         } else if (unpairedView) {
-            unpairedPlayers[exerciseKey] = unpairedView.textContent.trim();
+            const spans = unpairedView.querySelectorAll('span > span:first-child');
+            spans.forEach(span => unpairedList.push(span.textContent.trim()));
+        }
+
+        if (unpairedList.length > 0) {
+            unpairedPlayers[exerciseKey] = unpairedList;
         }
     });
 
@@ -618,7 +654,12 @@ function regenerateRemaining(button) {
                             player1: p.player1.name,
                             player2: p.player2.name
                         })),
-                        unpairedPlayer: unpaired ? unpaired.name : null
+                        name: ex.name,
+                        pairs: pairs.map(p => ({
+                            player1: p.player1.name,
+                            player2: p.player2.name
+                        })),
+                        unpairedPlayers: unpaired ? unpaired.map(u => u.name) : []
                     };
                 })
             };
@@ -666,13 +707,12 @@ function validatePairings(exerciseItem) {
     });
 
     // Add unpaired player to the list if it exists
-    let unpairedPlayer = null;
+    // Add unpaired players to the list if they exist
     if (unpairedEdit) {
-        const unpairedSelect = unpairedEdit.querySelector('.unpaired-player-select');
-        if (unpairedSelect) {
-            unpairedPlayer = unpairedSelect.value;
-            selectedPlayers.push(unpairedPlayer);
-        }
+        const unpairedSelects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+        unpairedSelects.forEach(select => {
+            selectedPlayers.push(select.value);
+        });
     }
 
     // Get all available players from the first dropdown
@@ -791,19 +831,18 @@ function validatePairings(exerciseItem) {
         }
     });
 
-    // Highlight unpaired player dropdown if it's a duplicate
-    if (unpairedEdit && unpairedPlayer) {
-        const unpairedSelect = unpairedEdit.querySelector('.unpaired-player-select');
-        if (unpairedSelect) {
-            unpairedSelect.classList.remove('duplicate-player', 'unused-player');
-
-            if (duplicates.includes(unpairedPlayer)) {
-                unpairedSelect.classList.add('duplicate-player');
-                console.log('  ❌ Added duplicate-player class to unpaired player', unpairedPlayer);
+    // Highlight unpaired player dropdowns if they are duplicates
+    if (unpairedEdit) {
+        const unpairedSelects = unpairedEdit.querySelectorAll('.unpaired-player-select');
+        unpairedSelects.forEach(select => {
+            select.classList.remove('duplicate-player', 'unused-player');
+            if (duplicates.includes(select.value)) {
+                select.classList.add('duplicate-player');
+                console.log('  ❌ Added duplicate-player class to unpaired player', select.value);
             }
 
             // Also highlight options in unpaired dropdown
-            Array.from(unpairedSelect.options).forEach(option => {
+            Array.from(select.options).forEach(option => {
                 option.style.backgroundColor = '';
                 option.style.color = '';
                 option.style.fontWeight = '';
@@ -818,7 +857,7 @@ function validatePairings(exerciseItem) {
                     option.style.fontWeight = 'bold';
                 }
             });
-        }
+        });
     }
 }
 

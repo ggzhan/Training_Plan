@@ -34,7 +34,7 @@ class TrainingPlanServiceTest {
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(players, 6);
+        TrainingSession session = trainingPlanService.generatePlan(players, 6, 1);
 
         // Verify
         assertNotNull(session);
@@ -61,7 +61,7 @@ class TrainingPlanServiceTest {
         csvServiceStub.setPlayers(players);
 
         // Test
-        TrainingSession session = trainingPlanService.generatePlan(players, 6);
+        TrainingSession session = trainingPlanService.generatePlan(players, 6, 1);
 
         // Verify
         assertNotNull(session);
@@ -70,6 +70,32 @@ class TrainingPlanServiceTest {
         assertNotNull(session.getUnpairedPlayers());
         assertEquals(session.getExercises().size(), session.getUnpairedPlayers().size()); // Each exercise should have
                                                                                           // an unpaired player
+    }
+
+    @Test
+    void generatePlan_withMultipleUnpairedPlayers() throws Exception {
+        // Mock players (5 players)
+        List<Player> players = Arrays.asList(
+                new Player("Player 1", 10),
+                new Player("Player 2", 9),
+                new Player("Player 3", 8),
+                new Player("Player 4", 7),
+                new Player("Player 5", 6));
+        csvServiceStub.setPlayers(players);
+
+        // Test with 3 unpaired players (so only 1 pair per exercise)
+        TrainingSession session = trainingPlanService.generatePlan(players, 6, 3);
+
+        // Verify
+        assertNotNull(session);
+        assertTrue(session.getExercises().size() > 0);
+        assertNotNull(session.getUnpairedPlayers());
+
+        // Check first exercise
+        com.example.trainingplanner.model.Exercise firstEx = session.getExercises().get(0);
+        List<Player> unpaired = session.getUnpairedPlayers().get(firstEx);
+        assertNotNull(unpaired);
+        assertEquals(3, unpaired.size());
     }
 
     // Manual Stub

@@ -7,7 +7,7 @@ import java.util.Map;
 public class RegenerateRequest {
     private int exerciseIndex;
     private Map<String, List<PairDto>> currentPairings;
-    private Map<String, String> unpairedPlayers;
+    private Map<String, List<String>> unpairedPlayers;
     private List<Player> availablePlayers;
 
     public static class PairDto {
@@ -58,11 +58,11 @@ public class RegenerateRequest {
         this.currentPairings = currentPairings;
     }
 
-    public Map<String, String> getUnpairedPlayers() {
+    public Map<String, List<String>> getUnpairedPlayers() {
         return unpairedPlayers;
     }
 
-    public void setUnpairedPlayers(Map<String, String> unpairedPlayers) {
+    public void setUnpairedPlayers(Map<String, List<String>> unpairedPlayers) {
         this.unpairedPlayers = unpairedPlayers;
     }
 

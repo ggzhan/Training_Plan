@@ -110,6 +110,15 @@
                             <input type="number" id="numberOfExercises" name="numberOfExercises" class="form-control"
                                 min="1" max="10" value="6" required>
                         </div>
+                        <div class="col-md-6">
+                            <label for="unpairedPlayersCount" class="form-label fw-bold">
+                                <i class="bi bi-person-dash"></i> Anzahl nicht gepaarter Spieler
+                            </label>
+                            <input type="number" class="form-control" id="unpairedPlayersCount"
+                                name="unpairedPlayersCount" value="1" min="0" max="10" required>
+                            <div class="form-text">Wie viele Spieler sollen nicht gepaart werden? Für Balleimer und
+                                Sparring</div>
+                        </div>
                     </div>
 
                     <input type="hidden" id="playersJson" name="playersJson">
@@ -174,6 +183,7 @@
                         <label for="playerKlassierung" class="form-label fw-bold">Klassierung (1-21)</label>
                         <input type="number" class="form-control" id="playerKlassierung" min="1" max="21" value="1">
                     </div>
+
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>

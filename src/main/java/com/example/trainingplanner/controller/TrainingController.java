@@ -53,6 +53,7 @@ public class TrainingController {
     @PostMapping("/generate-plan")
     public String generatePlan(@RequestParam("trainingDate") String trainingDate,
             @RequestParam(value = "numberOfExercises", defaultValue = "6") int numberOfExercises,
+            @RequestParam(value = "unpairedPlayersCount", defaultValue = "1") int unpairedPlayersCount,
             @RequestParam(value = "playersJson", required = false) String playersJson,
             Model model) {
         try {
@@ -69,7 +70,8 @@ public class TrainingController {
             }
 
             // Pass players to the service
-            TrainingSession session = trainingPlanService.generatePlan(players, numberOfExercises);
+            TrainingSession session = trainingPlanService.generatePlan(players, numberOfExercises,
+                    unpairedPlayersCount);
             model.addAttribute("trainingPlan", session);
             return "plan";
         } catch (Exception e) {

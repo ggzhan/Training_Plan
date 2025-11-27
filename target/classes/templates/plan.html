@@ -183,28 +183,35 @@
                                         </div>
                                     </div>
 
-                                    <!-- Unpaired Player -->
-                                    <div th:if="${trainingPlan.unpairedPlayers != null and trainingPlan.unpairedPlayers.get(exercise) != null}"
+                                    <!-- Unpaired Players -->
+                                    <div th:if="${trainingPlan.unpairedPlayers != null and trainingPlan.unpairedPlayers.get(exercise) != null and !trainingPlan.unpairedPlayers.get(exercise).isEmpty()}"
                                         class="mt-3">
                                         <!-- View Mode -->
                                         <div class="unpaired-view alert alert-warning mb-0">
                                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
                                             <strong>Ohne Partner:</strong>
-                                            <span th:text="${trainingPlan.unpairedPlayers.get(exercise).name}">Spieler
-                                                Name</span>
+                                            <span
+                                                th:each="player, iterStat : ${trainingPlan.unpairedPlayers.get(exercise)}">
+                                                <span th:text="${player.name}">Spieler Name</span><span
+                                                    th:if="${!iterStat.last}">, </span>
+                                            </span>
                                         </div>
                                         <!-- Edit Mode -->
                                         <div class="unpaired-edit" style="display: none;">
                                             <label class="form-label text-warning fw-bold">
                                                 <i class="bi bi-exclamation-triangle-fill"></i> Spieler ohne Partner:
                                             </label>
-                                            <select class="form-select player-select unpaired-player-select">
-                                                <option th:each="player : ${trainingPlan.availablePlayers}"
-                                                    th:value="${player.name}"
-                                                    th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
-                                                    th:selected="${player.name == trainingPlan.unpairedPlayers.get(exercise).name}">
-                                                </option>
-                                            </select>
+                                            <div th:each="unpairedPlayer, iterStat : ${trainingPlan.unpairedPlayers.get(exercise)}"
+                                                class="mb-2">
+                                                <select class="form-select player-select unpaired-player-select"
+                                                    th:attr="data-unpaired-index=${iterStat.index}">
+                                                    <option th:each="player : ${trainingPlan.availablePlayers}"
+                                                        th:value="${player.name}"
+                                                        th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
+                                                        th:selected="${player.name == unpairedPlayer.name}">
+                                                    </option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
 

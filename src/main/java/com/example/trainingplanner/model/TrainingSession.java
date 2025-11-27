@@ -10,7 +10,7 @@ public class TrainingSession {
     private String notes;
     private List<Exercise> exercises;
     private Map<Exercise, List<PlayerPair>> exercisePairs;
-    private Map<Exercise, Player> unpairedPlayers;
+    private Map<Exercise, List<Player>> unpairedPlayers;
     private Map<Exercise, Integer> exerciseDiffSums; // Sum of Klassierung differences for each exercise
     private List<Player> availablePlayers; // All players available for this session
 
@@ -57,11 +57,11 @@ public class TrainingSession {
         this.exercisePairs = exercisePairs;
     }
 
-    public Map<Exercise, Player> getUnpairedPlayers() {
+    public Map<Exercise, List<Player>> getUnpairedPlayers() {
         return unpairedPlayers;
     }
 
-    public void setUnpairedPlayers(Map<Exercise, Player> unpairedPlayers) {
+    public void setUnpairedPlayers(Map<Exercise, List<Player>> unpairedPlayers) {
         this.unpairedPlayers = unpairedPlayers;
     }
 
