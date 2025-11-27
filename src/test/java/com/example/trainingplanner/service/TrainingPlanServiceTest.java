@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -96,6 +97,81 @@ class TrainingPlanServiceTest {
         List<Player> unpaired = session.getUnpairedPlayers().get(firstEx);
         assertNotNull(unpaired);
         assertEquals(3, unpaired.size());
+    }
+
+    @Test
+    void regenerateRemainingExercises_shouldRotateUnpairedPlayers() {
+        // Setup 5 players
+        List<Player> players = Arrays.asList(
+                new Player("A", 10), new Player("B", 10),
+                new Player("C", 10), new Player("D", 10),
+                new Player("E", 10));
+
+        // Create request with Ex 1 having A unpaired
+        com.example.trainingplanner.dto.RegenerateRequest request = new com.example.trainingplanner.dto.RegenerateRequest();
+        request.setExerciseIndex(0); // Edit after Ex 1
+        request.setAvailablePlayers(players);
+
+        Map<String, List<com.example.trainingplanner.dto.RegenerateRequest.PairDto>> currentPairings = new java.util.HashMap<>();
+        // Ex 1: A unpaired. Pairs: B-C, D-E
+        List<com.example.trainingplanner.dto.RegenerateRequest.PairDto> pairsEx1 = new ArrayList<>();
+        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("B", "C"));
+        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("D", "E"));
+        currentPairings.put("Exercise 1", pairsEx1);
+
+        // Add placeholder for Ex 2 (to be regenerated)
+        currentPairings.put("Exercise 2", new ArrayList<>());
+
+        request.setCurrentPairings(currentPairings);
+
+        Map<String, List<String>> unpaired = new java.util.HashMap<>();
+        unpaired.put("Exercise 1", java.util.Collections.singletonList("A"));
+        request.setUnpairedPlayers(unpaired);
+
+        // Regenerate
+        com.example.trainingplanner.dto.RegenerateResponse response = trainingPlanService
+                .regenerateRemainingExercises(request);
+
+        // Verify Ex 2 does NOT have A unpaired
+        List<Player> unpairedEx2 = response.getUnpairedPlayers().get("Exercise 2");
+        assertNotNull(unpairedEx2);
+        assertEquals(1, unpairedEx2.size());
+        assertNotEquals("A", unpairedEx2.get(0).getName());
+
+        System.out.println("Ex 1 Unpaired: A");
+        System.out.println("Ex 2 Unpaired: " + unpairedEx2.get(0).getName());
+    }
+
+    @Test
+    void generatePlan_shouldRotateUnpairedPlayers() throws Exception {
+        // Setup 5 players
+        List<Player> players = Arrays.asList(
+                new Player("A", 10), new Player("B", 10),
+                new Player("C", 10), new Player("D", 10),
+                new Player("E", 10));
+        csvServiceStub.setPlayers(players);
+
+        // Generate plan with 5 exercises (should cover all players unpaired once)
+        TrainingSession session = trainingPlanService.generatePlan(players, 5, 1);
+
+        assertNotNull(session);
+        assertEquals(5, session.getExercises().size());
+
+        // Collect unpaired players from all exercises
+        List<String> unpairedNames = new ArrayList<>();
+        for (com.example.trainingplanner.model.Exercise ex : session.getExercises()) {
+            List<Player> unpaired = session.getUnpairedPlayers().get(ex);
+            assertNotNull(unpaired);
+            assertEquals(1, unpaired.size());
+            unpairedNames.add(unpaired.get(0).getName());
+        }
+
+        // Verify all 5 players are unpaired exactly once
+        for (Player p : players) {
+            assertTrue(unpairedNames.contains(p.getName()), "Player " + p.getName() + " should be unpaired once");
+            assertEquals(1, java.util.Collections.frequency(unpairedNames, p.getName()),
+                    "Player " + p.getName() + " should be unpaired exactly once");
+        }
     }
 
     // Manual Stub
