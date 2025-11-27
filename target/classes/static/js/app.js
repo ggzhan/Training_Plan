@@ -267,6 +267,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// Sorting State
+let currentSort = {
+    column: 'name', // 'name' or 'klassierung'
+    direction: 'asc' // 'asc' or 'desc'
+};
+
 function loadPlayers() {
     const dateSelect = document.getElementById('trainingDate');
     if (!dateSelect) return;
@@ -277,9 +283,59 @@ function loadPlayers() {
         .then(response => response.json())
         .then(players => {
             currentPlayers = players;
+            applySort(); // Sort before rendering
             renderPlayerList();
         })
         .catch(error => console.error('Error loading players:', error));
+}
+
+function sortPlayers(column) {
+    if (currentSort.column === column) {
+        // Toggle direction
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        // New column, default to asc
+        currentSort.column = column;
+        currentSort.direction = 'asc';
+    }
+
+    applySort();
+    renderPlayerList();
+    updateSortIcons();
+}
+
+function applySort() {
+    currentPlayers.sort((a, b) => {
+        let valA = a[currentSort.column];
+        let valB = b[currentSort.column];
+
+        // Case insensitive string comparison for names
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+function updateSortIcons() {
+    // Reset all icons
+    ['name', 'klassierung'].forEach(col => {
+        const icon = document.getElementById(`sortIcon-${col}`);
+        if (icon) {
+            icon.className = 'bi bi-arrow-down-up opacity-50'; // Neutral state
+        }
+    });
+
+    // Set active icon
+    const activeIcon = document.getElementById(`sortIcon-${currentSort.column}`);
+    if (activeIcon) {
+        activeIcon.className = currentSort.direction === 'asc'
+            ? 'bi bi-sort-down'
+            : 'bi bi-sort-up';
+        activeIcon.classList.remove('opacity-50');
+    }
 }
 
 function renderPlayerList() {
@@ -290,6 +346,9 @@ function renderPlayerList() {
 
     tbody.innerHTML = '';
     countSpan.textContent = currentPlayers.length;
+
+    // Ensure icons are correct on initial load/render
+    updateSortIcons();
 
     currentPlayers.forEach((player, index) => {
         const row = document.createElement('tr');
