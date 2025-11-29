@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Sorting State
 let currentSort = {
-    column: 'name', // 'name' or 'klassierung'
+    column: 'name', // 'name' or 'elo'
     direction: 'asc' // 'asc' or 'desc'
 };
 
@@ -321,7 +321,7 @@ function applySort() {
 
 function updateSortIcons() {
     // Reset all icons
-    ['name', 'klassierung'].forEach(col => {
+    ['name', 'elo'].forEach(col => {
         const icon = document.getElementById(`sortIcon-${col}`);
         if (icon) {
             icon.className = 'bi bi-arrow-down-up opacity-50'; // Neutral state
@@ -354,7 +354,7 @@ function renderPlayerList() {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${player.name}</td>
-            <td class="text-center"><span class="badge bg-primary">${player.klassierung}</span></td>
+            <td class="text-center"><span class="badge bg-primary">${player.elo}</span></td>
             <td class="text-end">
                 <div class="btn-group" role="group">
                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="editPlayer(${index})">
@@ -374,7 +374,7 @@ function openAddPlayerModal() {
     editingPlayerIndex = null;
     document.getElementById('modalTitle').textContent = 'Add Player';
     document.getElementById('playerName').value = '';
-    document.getElementById('playerKlassierung').value = '1';
+    document.getElementById('playerElo').value = '1200';
 }
 
 function editPlayer(index) {
@@ -383,31 +383,31 @@ function editPlayer(index) {
 
     document.getElementById('modalTitle').textContent = 'Edit Player';
     document.getElementById('playerName').value = player.name;
-    document.getElementById('playerKlassierung').value = player.klassierung;
+    document.getElementById('playerElo').value = player.elo;
 
     playerModal.show();
 }
 
 function savePlayer() {
     const name = document.getElementById('playerName').value.trim();
-    const klassierung = parseInt(document.getElementById('playerKlassierung').value);
+    const elo = parseInt(document.getElementById('playerElo').value);
 
     if (!name) {
         alert('Please enter a player name.');
         return;
     }
 
-    if (isNaN(klassierung) || klassierung < 1 || klassierung > 21) {
-        alert('Invalid Klassierung. Must be between 1 and 21.');
+    if (isNaN(elo) || elo < 1 || elo > 4000) {
+        alert('Invalid Elo. Must be between 1 and 4000.');
         return;
     }
 
     if (editingPlayerIndex !== null) {
         // Edit existing player
-        currentPlayers[editingPlayerIndex] = { name, klassierung };
+        currentPlayers[editingPlayerIndex] = { name, elo };
     } else {
         // Add new player
-        currentPlayers.push({ name, klassierung });
+        currentPlayers.push({ name, elo });
     }
 
     renderPlayerList();
@@ -653,17 +653,26 @@ function regenerateRemaining(button) {
             if (playerName && !seenPlayers.has(playerName)) {
                 seenPlayers.add(playerName);
 
-                // Parse Klassierung from text: "Name (K)"
-                let klassierung = 1;
+                // Parse Elo from text: "Name (K)" -> "Name (E)" but format is likely just number in parens
+                // Assuming backend sends "Name (Elo)" or similar if it formats it, 
+                // but actually availablePlayers comes from dropdown text.
+                // The dropdown text usually comes from `player.toString()` or custom formatting.
+                // Wait, in `regenerateRemaining`, `availablePlayers` are collected from dropdown options.
+                // The dropdown options in `plan.html` (which I haven't seen yet but assuming) 
+                // might display "Name (Elo)".
+                // Let's check `plan.html` content later or assume standard format.
+                // The regex `/\((\d+)\)$/` matches "(123)" at end of string.
+                // This should still work if the number is Elo.
+                let elo = 1200;
                 const text = option.textContent;
                 const match = text.match(/\((\d+)\)$/);
                 if (match) {
-                    klassierung = parseInt(match[1]);
+                    elo = parseInt(match[1]);
                 }
 
                 availablePlayers.push({
                     name: playerName,
-                    klassierung: klassierung
+                    elo: elo
                 });
             }
         });

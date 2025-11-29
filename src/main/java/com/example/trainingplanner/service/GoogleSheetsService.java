@@ -20,7 +20,7 @@ import java.util.Map;
 @Service
 public class GoogleSheetsService {
 
-    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/1gbevNRuWtom10K-bJVvTUc9MuD5i6SaH2BdrFoKWw0I/gviz/tq?tqx=out:json";
+    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/1EP4h_GzHqa8vCbHseNCgV_aBnQ0VaO0asLUQlvKKoFM/gviz/tq?tqx=out:json";
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -69,7 +69,7 @@ public class GoogleSheetsService {
             List<String> dates = new ArrayList<>();
             JsonNode cols = cachedData.get("table").get("cols");
 
-            // Skip first two columns (Klassierung, Name), rest are dates
+            // Skip first two columns (Elo, Name), rest are dates
             for (int i = 2; i < cols.size(); i++) {
                 String dateLabel = cols.get(i).get("label").asText();
                 if (!dateLabel.isEmpty()) {
@@ -189,15 +189,15 @@ public class GoogleSheetsService {
                     // Only accept exactly "X" (case-insensitive, trimmed)
                     // Excludes: X(1), W(1), x(2), etc.
                     if (availability != null && availability.trim().equalsIgnoreCase("X")) {
-                        // Get Klassierung (column index 0)
-                        int klassierung = 0;
-                        JsonNode klassierungCell = cells.get(0);
-                        if (klassierungCell != null && !klassierungCell.isNull() && klassierungCell.has("v")) {
-                            klassierung = (int) klassierungCell.get("v").asDouble();
+                        // Get Elo (column index 0)
+                        int elo = 0;
+                        JsonNode eloCell = cells.get(0);
+                        if (eloCell != null && !eloCell.isNull() && eloCell.has("v")) {
+                            elo = (int) eloCell.get("v").asDouble();
                         }
 
-                        players.add(new Player(name, klassierung));
-                        System.out.println("  Added player: " + name + " (Klassierung: " + klassierung
+                        players.add(new Player(name, elo));
+                        System.out.println("  Added player: " + name + " (Elo: " + elo
                                 + ", Availability: " + availability + ")");
                     }
                 }

@@ -170,10 +170,9 @@
                                             <th onclick="sortPlayers('name')" style="cursor: pointer;">
                                                 Name <i id="sortIcon-name" class="bi bi-arrow-down-up"></i>
                                             </th>
-                                            <th class="text-center" onclick="sortPlayers('klassierung')"
+                                            <th class="text-center" onclick="sortPlayers('elo')"
                                                 style="cursor: pointer;">
-                                                Klassierung <i id="sortIcon-klassierung"
-                                                    class="bi bi-arrow-down-up"></i>
+                                                Elo <i id="sortIcon-elo" class="bi bi-arrow-down-up"></i>
                                             </th>
                                             <th class="text-end">Aktionen</th>
                                         </tr>
@@ -210,8 +209,8 @@
                         <input type="text" class="form-control" id="playerName" placeholder="Spielername eingeben">
                     </div>
                     <div class="mb-3">
-                        <label for="playerKlassierung" class="form-label fw-bold">Klassierung (1-21)</label>
-                        <input type="number" class="form-control" id="playerKlassierung" min="1" max="21" value="1">
+                        <label for="playerElo" class="form-label fw-bold">Elo (1-4000)</label>
+                        <input type="number" class="form-control" id="playerElo" min="1" max="4000" value="1200">
                     </div>
 
                 </div>

@@ -237,18 +237,18 @@ public class CsvService {
 
                 // Check availability (X or x(n))
                 if (availability.equalsIgnoreCase("X") || availability.toLowerCase().startsWith("x(")) {
-                    int klassierung = 0;
+                    int elo = 0;
                     try {
-                        // Parse Klassierung from column 0
-                        String klassierungStr = columns[0].trim();
-                        if (!klassierungStr.isEmpty()) {
-                            klassierung = Integer.parseInt(klassierungStr);
+                        // Parse Elo from column 0
+                        String eloStr = columns[0].trim();
+                        if (!eloStr.isEmpty()) {
+                            elo = Integer.parseInt(eloStr);
                         }
                     } catch (NumberFormatException e) {
                         // Default to 0 if parsing fails
-                        System.err.println("Failed to parse Klassierung for player " + name + ": " + columns[0]);
+                        System.err.println("Failed to parse Elo for player " + name + ": " + columns[0]);
                     }
-                    players.add(new Player(name, klassierung));
+                    players.add(new Player(name, elo));
                 }
             }
 

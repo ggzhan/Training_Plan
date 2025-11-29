@@ -213,7 +213,7 @@
                                                             th:attr="data-pair-index=${pairStat.index}">
                                                             <option th:each="player : ${trainingPlan.availablePlayers}"
                                                                 th:value="${player.name}"
-                                                                th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
+                                                                th:text="${player.name} + ' (' + ${player.elo} + ')'"
                                                                 th:selected="${player.name == pair.player1.name}">
                                                             </option>
                                                         </select>
@@ -222,7 +222,7 @@
                                                             th:attr="data-pair-index=${pairStat.index}">
                                                             <option th:each="player : ${trainingPlan.availablePlayers}"
                                                                 th:value="${player.name}"
-                                                                th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
+                                                                th:text="${player.name} + ' (' + ${player.elo} + ')'"
                                                                 th:selected="${player.name == pair.player2.name}">
                                                             </option>
                                                         </select>
@@ -256,7 +256,7 @@
                                                     th:attr="data-unpaired-index=${iterStat.index}">
                                                     <option th:each="player : ${trainingPlan.availablePlayers}"
                                                         th:value="${player.name}"
-                                                        th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
+                                                        th:text="${player.name} + ' (' + ${player.elo} + ')'"
                                                         th:selected="${player.name == unpairedPlayer.name}">
                                                     </option>
                                                 </select>

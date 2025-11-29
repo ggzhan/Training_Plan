@@ -60,9 +60,9 @@ public class TrainingPlanService {
      * selects the best 6.
      */
     /**
-     * Generate pairings for all exercises using Klassierung-optimized round-robin
+     * Generate pairings for all exercises using Elo-optimized round-robin
      * algorithm.
-     * Generates all possible rounds, calculates Klassierung differences.
+     * Generates all possible rounds, calculates Elo differences.
      * Returns a list of valid rounds sorted by score.
      */
     private List<RoundWithScore> generateRounds(List<Player> players, int requiredUnpairedCount) {
@@ -73,7 +73,7 @@ public class TrainingPlanService {
             return new ArrayList<>();
         }
 
-        System.out.println("=== Klassierung-Optimized Round-Robin Pairing ===");
+        System.out.println("=== Elo-Optimized Round-Robin Pairing ===");
         System.out.println("Players: " + numPlayers);
 
         // For round-robin, we need even number of players
@@ -97,14 +97,14 @@ public class TrainingPlanService {
             Player p1 = players.get(0);
             Player p2 = rotatingPlayers.get(rotatingPlayers.size() - 1);
             pairs.add(new PlayerPair(p1, p2));
-            totalDiff += Math.abs(p1.getKlassierung() - p2.getKlassierung());
+            totalDiff += Math.abs(p1.getElo() - p2.getElo());
 
             // Other players pair up
             for (int i = 0; i < rotatingPlayers.size() / 2; i++) {
                 Player player1 = rotatingPlayers.get(i);
                 Player player2 = rotatingPlayers.get(rotatingPlayers.size() - 2 - i);
                 pairs.add(new PlayerPair(player1, player2));
-                totalDiff += Math.abs(player1.getKlassierung() - player2.getKlassierung());
+                totalDiff += Math.abs(player1.getElo() - player2.getElo());
             }
 
             allRounds.add(new RoundWithScore(pairs, totalDiff));
@@ -394,7 +394,7 @@ public class TrainingPlanService {
                 if (!roundUnpaired.isEmpty()) {
                     int roundScore = 0;
                     for (PlayerPair p : realPairs) {
-                        roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
+                        roundScore += Math.abs(p.getPlayer1().getElo() - p.getPlayer2().getElo());
                     }
                     allRounds.add(new RoundWithScoreRegen(realPairs, roundScore, roundUnpaired));
                 }
@@ -411,7 +411,7 @@ public class TrainingPlanService {
                 List<PlayerPair> pairs = round.pairs;
                 int roundScore = 0;
                 for (PlayerPair p : pairs) {
-                    roundScore += Math.abs(p.getPlayer1().getKlassierung() - p.getPlayer2().getKlassierung());
+                    roundScore += Math.abs(p.getPlayer1().getElo() - p.getPlayer2().getElo());
                 }
                 allRounds.add(new RoundWithScoreRegen(pairs, roundScore, new ArrayList<>()));
             }
