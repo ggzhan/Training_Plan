@@ -356,12 +356,14 @@ function renderPlayerList() {
             <td>${player.name}</td>
             <td class="text-center"><span class="badge bg-primary">${player.klassierung}</span></td>
             <td class="text-end">
-                <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editPlayer(${index})">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePlayer(${index})">
-                    <i class="bi bi-trash"></i>
-                </button>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editPlayer(${index})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePlayer(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(row);

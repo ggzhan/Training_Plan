@@ -76,6 +76,55 @@
         [data-bs-toggle="collapse"]:not(.collapsed) .collapse-icon {
             transform: rotate(180deg);
         }
+
+        /* Reduce vertical space in edit mode */
+        .pair-view[style*="display: none"],
+        .unpaired-view[style*="display: none"] {
+            display: none !important;
+            height: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Mobile button spacing */
+        @media (max-width: 768px) {
+            .card-header .btn-group {
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                gap: 0.5rem;
+            }
+
+            .card-header .btn-group .btn {
+                width: 100%;
+                margin: 0;
+            }
+
+            .exercise-card .card-header .d-flex {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+
+            .exercise-card .card-header h5 {
+                margin-bottom: 0.75rem;
+            }
+
+            /* Keep player selects side by side on mobile */
+            .player-select {
+                font-size: 0.75rem;
+                padding: 0.25rem 1.5rem 0.25rem 0.25rem;
+            }
+
+            .input-group-sm .form-select {
+                font-size: 0.75rem;
+                padding: 0.25rem 1.5rem 0.25rem 0.25rem;
+            }
+
+            .input-group-text {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+            }
+        }
     </style>
 </head>
 
@@ -124,7 +173,7 @@
                                         <i class="bi bi-trophy"></i> Übung <span
                                             th:text="${exerciseStat.count}">1</span>
                                     </h5>
-                                    <div>
+                                    <div class="btn-group" role="group">
                                         <button class="btn btn-light btn-sm"
                                             th:attr="data-exercise-index=${exerciseStat.index}"
                                             onclick="toggleEditMode(this)">
