@@ -6,8 +6,8 @@ com/example/trainingplanner/dto/RegenerateRequest$PairDto.class
 com/example/trainingplanner/dto/RegenerateRequest.class
 com/example/trainingplanner/model/PlayerPair.class
 com/example/trainingplanner/controller/TrainingController.class
-com/example/trainingplanner/TrainingPlannerApplication.class
 com/example/trainingplanner/service/TrainingPlanService$RoundWithScore.class
+com/example/trainingplanner/TrainingPlannerApplication.class
 com/example/trainingplanner/model/Player.class
 com/example/trainingplanner/dto/RegenerateResponse$ExerciseDto.class
 com/example/trainingplanner/controller/TrainingController$1.class

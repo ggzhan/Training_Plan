@@ -69,8 +69,8 @@ public class GoogleSheetsService {
             List<String> dates = new ArrayList<>();
             JsonNode cols = cachedData.get("table").get("cols");
 
-            // Skip first two columns (Elo, Name), rest are dates
-            for (int i = 2; i < cols.size(); i++) {
+            // Skip first three columns (Elo, Name, Vorname), rest are dates
+            for (int i = 3; i < cols.size(); i++) {
                 String dateLabel = cols.get(i).get("label").asText();
                 if (!dateLabel.isEmpty()) {
                     dates.add(dateLabel);
@@ -173,11 +173,20 @@ public class GoogleSheetsService {
                 if (nameCell == null || nameCell.isNull() || !nameCell.has("v")) {
                     continue;
                 }
+                String lastName = nameCell.get("v").asText();
 
-                String name = nameCell.get("v").asText();
+                // Get vorname (column index 2)
+                JsonNode vornameCell = cells.get(2);
+                String firstName = "";
+                if (vornameCell != null && !vornameCell.isNull() && vornameCell.has("v")) {
+                    firstName = vornameCell.get("v").asText();
+                }
+
+                String fullName = (firstName + " " + lastName).trim();
 
                 // Skip special rows
-                if (name.equals("Freie Plätze") || name.equals("Max Teilnehmer pro Training") || name.matches("\\d+")) {
+                if (lastName.equals("Freie Plätze") || lastName.equals("Max Teilnehmer pro Training")
+                        || lastName.matches("\\d+")) {
                     continue;
                 }
 
@@ -196,8 +205,8 @@ public class GoogleSheetsService {
                             elo = (int) eloCell.get("v").asDouble();
                         }
 
-                        players.add(new Player(name, elo));
-                        System.out.println("  Added player: " + name + " (Elo: " + elo
+                        players.add(new Player(fullName, elo));
+                        System.out.println("  Added player: " + fullName + " (Elo: " + elo
                                 + ", Availability: " + availability + ")");
                     }
                 }
