@@ -37,22 +37,22 @@ public class GoogleSheetsService {
     // Refresh data every 15 minutes (900000 ms)
     @Scheduled(fixedRate = 900000)
     public void scheduledRefresh() {
-        System.out.println("Scheduled refresh triggered at: " + LocalDateTime.now());
+
         refreshData();
     }
 
     // Manual refresh method
     public synchronized void refreshData() {
         try {
-            System.out.println("Fetching data from Google Sheets...");
+
             String response = restTemplate.getForObject(SHEETS_URL, String.class);
             cachedData = parseGoogleSheetsResponse(response);
             lastRefresh = LocalDateTime.now();
             playerCache.clear(); // Clear player cache when data is refreshed
-            System.out.println("Data refreshed successfully at: " + lastRefresh);
+
         } catch (Exception e) {
             System.err.println("Error refreshing data: " + e.getMessage());
-            e.printStackTrace();
+
         }
     }
 
@@ -79,7 +79,7 @@ public class GoogleSheetsService {
 
             return dates;
         } catch (Exception e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }
@@ -133,7 +133,7 @@ public class GoogleSheetsService {
     public List<Player> readPlayersForDate(String targetDate) {
         // Check cache first
         if (playerCache.containsKey(targetDate)) {
-            System.out.println("Returning cached players for " + targetDate);
+
             return playerCache.get(targetDate);
         }
 
@@ -153,7 +153,7 @@ public class GoogleSheetsService {
             }
 
             if (dateColumnIndex == -1) {
-                System.out.println("Date not found: " + targetDate);
+
                 return new ArrayList<>();
             }
 
@@ -197,18 +197,17 @@ public class GoogleSheetsService {
                         }
 
                         players.add(new Player(name, klassierung));
-                        System.out.println("  Added player: " + name + " (Klassierung: " + klassierung
-                                + ", Availability: " + availability + ")");
+
                     }
                 }
             }
 
             // Cache the result
             playerCache.put(targetDate, players);
-            System.out.println("Loaded " + players.size() + " players for " + targetDate);
+
             return players;
         } catch (Exception e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }

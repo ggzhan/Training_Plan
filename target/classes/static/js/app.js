@@ -50,7 +50,7 @@ function captureState() {
 function restoreState(state) {
     if (!state) return;
 
-    console.log('🔄 Restoring state:', state);
+
 
     const allExerciseCards = document.querySelectorAll('.exercise-card');
 
@@ -119,7 +119,7 @@ function restoreState(state) {
             pairsContainer.appendChild(newPair);
         });
 
-        console.log(`  Exercise ${idx + 1}: Restored ${exerciseState.pairs.length} pairs`);
+
 
         // Update unpaired players
         if (exerciseState.unpairedPlayers && exerciseState.unpairedPlayers.length > 0) {
@@ -166,7 +166,7 @@ function undo() {
     const previousState = historyStack.pop();
     restoreState(previousState);
 
-    console.log('Undo performed. History stack size:', historyStack.length);
+
 }
 
 // Redo the last undone change
@@ -181,7 +181,7 @@ function redo() {
     const nextState = redoStack.pop();
     restoreState(nextState);
 
-    console.log('Redo performed. Redo stack size:', redoStack.length);
+
 }
 
 // Update undo/redo button states
@@ -206,7 +206,7 @@ function refreshData() {
     fetch('/api/refresh', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
-            console.log('Data refreshed:', data);
+
             // Reload players for current date
             loadPlayers();
             btn.textContent = '✓ Refreshed!';
@@ -438,14 +438,14 @@ function toggleEditMode(button) {
     const unpairedView = exerciseCard.querySelector('.unpaired-view');
     const unpairedEdit = exerciseCard.querySelector('.unpaired-edit');
 
-    const isEditing = button.innerHTML.includes('Bearbeiten');
+    const isEditing = button.innerHTML.includes('bi-pencil');
 
     if (!isEditing) {
         // Save mode - capture state before making changes
         const currentState = captureState();
         historyStack.push(currentState);
         redoStack = []; // Clear redo stack on new edit
-        console.log('State captured. History stack size:', historyStack.length);
+
 
         // Collect changes and update view
         pairEdits.forEach((editDiv, index) => {
@@ -485,7 +485,8 @@ function toggleEditMode(button) {
             unpairedView.style.display = 'block';
             unpairedEdit.style.display = 'none';
         }
-        button.innerHTML = '<i class="bi bi-pencil"></i> Bearbeiten';
+        button.innerHTML = '<i class="bi bi-pencil"></i>';
+        button.title = "Bearbeiten";
 
         // Update undo/redo button states
         updateUndoRedoButtons();
@@ -503,7 +504,8 @@ function toggleEditMode(button) {
             unpairedView.style.display = 'none';
             unpairedEdit.style.display = 'block';
         }
-        button.innerHTML = '<i class="bi bi-check-circle"></i> Speichern';
+        button.innerHTML = '<i class="bi bi-check-lg"></i> Speichern';
+        button.title = "Speichern";
 
         // Show regenerate button (unless it's the last exercise)
         const regenerateBtn = exerciseCard.querySelector('.regenerate-btn');
@@ -568,7 +570,7 @@ function regenerateRemaining(button) {
     const exerciseIndex = parseInt(button.getAttribute('data-exercise-index'));
     const allExerciseCards = document.querySelectorAll('.exercise-card');
 
-    console.log('Regenerating exercises after index:', exerciseIndex);
+
 
     // NOTE: We do NOT capture state here because it was already captured
     // when the user clicked Save after editing. Capturing again would
@@ -668,7 +670,7 @@ function regenerateRemaining(button) {
             }
         });
 
-        console.log('Collected available players:', availablePlayers.length);
+
     }
 
     // Build request
@@ -679,7 +681,7 @@ function regenerateRemaining(button) {
         availablePlayers: availablePlayers
     };
 
-    console.log('Regenerate request:', request);
+
 
     // Call backend API
     fetch('/api/regenerate-exercises', {
@@ -734,7 +736,7 @@ function regenerateRemaining(button) {
             updateUndoRedoButtons();
 
             // Show success message
-            console.log('Regeneration complete.');
+
 
             // Reset button state after a short delay
             setTimeout(() => {
@@ -798,128 +800,31 @@ function validatePairings(exerciseItem) {
 
     // DEBUG: Show what we found
     if (duplicates.length > 0 || unused.length > 0) {
-        console.log('🔍 Validation Results:');
-        console.log('  Duplicates (RED):', duplicates);
-        console.log('  Unused (YELLOW):', unused);
-        console.log('  Player counts:', playerCounts);
+        // ... (existing debug code if any, or just leave it)
     }
 
-    // Show/hide warning messages
-    let warningDiv = exerciseItem.querySelector('.validation-warning');
-    if (duplicates.length > 0 || unused.length > 0) {
-        if (!warningDiv) {
-            warningDiv = document.createElement('div');
-            warningDiv.className = 'validation-warning';
-            const pairsList = exerciseItem.querySelector('.pairs-list');
-            pairsList.parentNode.insertBefore(warningDiv, pairsList);
-        }
-
-        let warningHTML = '';
+    // Update UI
+    const warningsDiv = exerciseItem.querySelector('.validation-warnings');
+    if (warningsDiv) {
+        let html = '';
         if (duplicates.length > 0) {
-            warningHTML += `<div class="warning-duplicate">⚠️ Duplicate: ${duplicates.join(', ')}</div>`;
+            html += `<div class="alert alert-danger py-2 mb-2"><small><i class="bi bi-exclamation-circle"></i> <strong>Doppelt:</strong> ${duplicates.join(', ')}</small></div>`;
         }
         if (unused.length > 0) {
-            warningHTML += `<div class="warning-unused">⚠️ Unused: ${unused.join(', ')}</div>`;
+            html += `<div class="alert alert-warning py-2 mb-0"><small><i class="bi bi-info-circle"></i> <strong>Nicht zugewiesen:</strong> ${unused.join(', ')}</small></div>`;
         }
-        warningDiv.innerHTML = warningHTML;
-    } else if (warningDiv) {
-        warningDiv.remove();
+        warningsDiv.innerHTML = html;
     }
 
-    // Highlight pair containers and selects
-    const pairItems = exerciseItem.querySelectorAll('.pair-item');
-    pairItems.forEach((pairItem, index) => {
-        const editSpan = pairItem.querySelector('.pair-edit');
-        if (editSpan) {
-            const player1Select = editSpan.querySelector('.player1-select');
-            const player2Select = editSpan.querySelector('.player2-select');
-            const player1 = player1Select.value;
-            const player2 = player2Select.value;
-
-            // Remove all validation classes
-            pairItem.classList.remove('has-duplicate', 'has-unused');
-            player1Select.classList.remove('duplicate-player', 'unused-player');
-            player2Select.classList.remove('duplicate-player', 'unused-player');
-
-            // Highlight dropdown options for duplicates and unused
-            [player1Select, player2Select].forEach(select => {
-                Array.from(select.options).forEach(option => {
-                    option.style.backgroundColor = '';
-                    option.style.color = '';
-                    option.style.fontWeight = '';
-
-                    if (duplicates.includes(option.value)) {
-                        option.style.backgroundColor = '#dc2626';
-                        option.style.color = '#ffffff';
-                        option.style.fontWeight = 'bold';
-                    } else if (unused.includes(option.value)) {
-                        option.style.backgroundColor = '#f59e0b';
-                        option.style.color = '#ffffff';
-                        option.style.fontWeight = 'bold';
-                    }
-                });
-            });
-
-            // Add classes based on validation
-            let hasDuplicate = false;
-            let hasUnused = false;
-
-            if (duplicates.includes(player1)) {
-                player1Select.classList.add('duplicate-player');
-                hasDuplicate = true;
-                console.log('  ❌ Added duplicate-player class to', player1);
-            } else if (unused.includes(player1)) {
-                player1Select.classList.add('unused-player');
-                hasUnused = true;
-                console.log('  ⚠️ Added unused-player class to', player1);
-            }
-
-            if (duplicates.includes(player2)) {
-                player2Select.classList.add('duplicate-player');
-                hasDuplicate = true;
-                console.log('  ❌ Added duplicate-player class to', player2);
-            } else if (unused.includes(player2)) {
-                player2Select.classList.add('unused-player');
-                hasUnused = true;
-                console.log('  ⚠️ Added unused-player class to', player2);
-            }
-
-            if (hasDuplicate) {
-                pairItem.classList.add('has-duplicate');
-            } else if (hasUnused) {
-                pairItem.classList.add('has-unused');
-            }
+    // Highlight duplicates in dropdowns
+    allSelects.forEach(select => {
+        if (duplicates.includes(select.value)) {
+            select.classList.add('duplicate');
+            select.classList.remove('unused');
+        } else {
+            select.classList.remove('duplicate');
         }
     });
-
-    // Highlight unpaired player dropdowns if they are duplicates
-    if (unpairedEdit) {
-        const unpairedSelects = unpairedEdit.querySelectorAll('.unpaired-player-select');
-        unpairedSelects.forEach(select => {
-            select.classList.remove('duplicate-player', 'unused-player');
-            if (duplicates.includes(select.value)) {
-                select.classList.add('duplicate-player');
-                console.log('  ❌ Added duplicate-player class to unpaired player', select.value);
-            }
-
-            // Also highlight options in unpaired dropdown
-            Array.from(select.options).forEach(option => {
-                option.style.backgroundColor = '';
-                option.style.color = '';
-                option.style.fontWeight = '';
-
-                if (duplicates.includes(option.value)) {
-                    option.style.backgroundColor = '#dc2626';
-                    option.style.color = '#ffffff';
-                    option.style.fontWeight = 'bold';
-                } else if (unused.includes(option.value)) {
-                    option.style.backgroundColor = '#f59e0b';
-                    option.style.color = '#ffffff';
-                    option.style.fontWeight = 'bold';
-                }
-            });
-        });
-    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
