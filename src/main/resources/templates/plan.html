@@ -234,7 +234,8 @@
                                     <div th:if="${trainingPlan.unpairedPlayers != null and trainingPlan.unpairedPlayers.get(exercise) != null and !trainingPlan.unpairedPlayers.get(exercise).isEmpty()}"
                                         class="mt-3">
                                         <!-- View Mode -->
-                                        <div class="unpaired-view alert alert-warning mb-0">
+                                        <div class="unpaired-view alert alert-warning mb-0"
+                                            th:attr="data-unpaired-names=${#strings.listJoin(trainingPlan.unpairedPlayers.get(exercise).![name], ',')}">
                                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
                                             <strong>Ohne Partner:</strong>
                                             <span
@@ -325,31 +326,33 @@
                     // Get unpaired players
                     const unpairedView = card.querySelector('.unpaired-view');
                     if (unpairedView) {
-                        const unpairedNames = [];
-                        unpairedView.querySelectorAll('span[th\\:text], span:not(.input-group-text)').forEach(span => {
-                            const name = span.textContent.trim();
-                            if (name && name !== ',' && name !== 'Ohne Partner:' && !name.includes(':')) {
-                                unpairedNames.push(name);
-                            }
-                        });
+                        let names = [];
 
-                        // Alternative: extract from the text content
-                        if (unpairedNames.length === 0) {
-                            const text = unpairedView.textContent;
+                        // Method 1: Try data attribute (most reliable)
+                        if (unpairedView.dataset.unpairedNames) {
+                            names = unpairedView.dataset.unpairedNames.split(',').map(n => n.trim()).filter(n => n);
+                        }
+                        // Method 2: Fallback to text parsing (for backward compatibility if needed)
+                        else {
+                            const text = unpairedView.textContent.replace(/\s+/g, ' ').trim();
                             const match = text.match(/Ohne Partner:\s*(.+)/);
                             if (match) {
-                                const names = match[1].split(',').map(n => n.trim()).filter(n => n);
-                                unpairedNames.push(...names);
+                                const namesSet = new Set(
+                                    match[1].split(',')
+                                        .map(n => n.trim().replace(/[,;:]+$/, '').trim())
+                                        .filter(n => n && n.length > 0)
+                                );
+                                names = [...namesSet];
                             }
                         }
 
-                        if (unpairedNames.length > 0) {
-                            request.unpairedPlayers[exerciseKey] = unpairedNames;
+                        if (names.length > 0) {
+                            request.unpairedPlayers[exerciseKey] = names;
                         }
                     }
                 });
 
-                console.log('PDF Export request:', request);
+                console.log('PDF Export request (FIXED v2):', request);
 
                 // Send request to backend
                 fetch('/api/export-pdf', {
