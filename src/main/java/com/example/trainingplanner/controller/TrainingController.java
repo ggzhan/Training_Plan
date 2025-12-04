@@ -87,5 +87,4 @@ public class TrainingController {
             @RequestBody RegenerateRequest request) {
         return trainingPlanService.regenerateRemainingExercises(request);
     }
-
 }
