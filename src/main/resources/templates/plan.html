@@ -269,11 +269,14 @@
                         </div>
                     </div>
 
-                    <!-- Back Link -->
+                    <!-- Back Link and Export -->
                     <div class="mt-4 text-center">
-                        <a href="/" class="btn btn-gradient btn-lg">
+                        <a href="/" class="btn btn-gradient btn-lg me-2">
                             <i class="bi bi-arrow-left-circle"></i> Weiteren Plan erstellen
                         </a>
+                        <button onclick="exportPdf()" class="btn btn-outline-primary btn-lg">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF Export
+                        </button>
                     </div>
                 </div>
             </div>
@@ -282,6 +285,103 @@
         <!-- Bootstrap 5 JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script th:src="@{/js/app.js(v=24)}"></script>
+        <script th:inline="javascript">
+            // PDF Export function
+            function exportPdf() {
+                // Get player count and exercise count from the page
+                const playerCount = /*[[${trainingPlan.playerCount}]]*/ 0;
+                const exerciseCount = /*[[${trainingPlan.exercises.size()}]]*/ 0;
+
+                const request = {
+                    playerCount: playerCount,
+                    exercises: [],
+                    exercisePairs: {},
+                    unpairedPlayers: {}
+                };
+
+                // Extract data from DOM for each exercise
+                document.querySelectorAll('.exercise-card').forEach((card, index) => {
+                    const exerciseKey = 'Exercise ' + (index + 1);
+                    request.exercises.push({ name: exerciseKey });
+
+                    // Get pairs from view mode (pair-view elements)
+                    const pairs = [];
+                    card.querySelectorAll('.pair-view').forEach(pairEl => {
+                        const strongEls = pairEl.querySelectorAll('strong');
+                        if (strongEls.length >= 2) {
+                            pairs.push({
+                                player1Name: strongEls[0].textContent.trim(),
+                                player1Klassierung: 0,
+                                player2Name: strongEls[1].textContent.trim(),
+                                player2Klassierung: 0
+                            });
+                        }
+                    });
+
+                    if (pairs.length > 0) {
+                        request.exercisePairs[exerciseKey] = pairs;
+                    }
+
+                    // Get unpaired players
+                    const unpairedView = card.querySelector('.unpaired-view');
+                    if (unpairedView) {
+                        const unpairedNames = [];
+                        unpairedView.querySelectorAll('span[th\\:text], span:not(.input-group-text)').forEach(span => {
+                            const name = span.textContent.trim();
+                            if (name && name !== ',' && name !== 'Ohne Partner:' && !name.includes(':')) {
+                                unpairedNames.push(name);
+                            }
+                        });
+
+                        // Alternative: extract from the text content
+                        if (unpairedNames.length === 0) {
+                            const text = unpairedView.textContent;
+                            const match = text.match(/Ohne Partner:\s*(.+)/);
+                            if (match) {
+                                const names = match[1].split(',').map(n => n.trim()).filter(n => n);
+                                unpairedNames.push(...names);
+                            }
+                        }
+
+                        if (unpairedNames.length > 0) {
+                            request.unpairedPlayers[exerciseKey] = unpairedNames;
+                        }
+                    }
+                });
+
+                console.log('PDF Export request:', request);
+
+                // Send request to backend
+                fetch('/api/export-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('PDF export failed');
+                        }
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        // Download the PDF
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'trainingsplan.pdf';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+                    })
+                    .catch(error => {
+                        console.error('Export error:', error);
+                        alert('PDF Export fehlgeschlagen');
+                    });
+            }
+        </script>
 </body>
 
 </html>
