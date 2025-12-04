@@ -86,28 +86,26 @@
             padding: 0;
         }
 
+        /* Compact Card Styling */
+        .card-header {
+            padding: 0.5rem 1rem;
+        }
+
+        .card-body {
+            padding: 0.75rem;
+        }
+
+        h5 {
+            font-size: 1.1rem;
+        }
+
+        .alert {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.9rem;
+        }
+
         /* Mobile button spacing */
         @media (max-width: 768px) {
-            .card-header .btn-group {
-                display: flex;
-                flex-direction: column;
-                width: 100%;
-                gap: 0.5rem;
-            }
-
-            .card-header .btn-group .btn {
-                width: 100%;
-                margin: 0;
-            }
-
-            .exercise-card .card-header .d-flex {
-                flex-direction: column;
-                align-items: stretch !important;
-            }
-
-            .exercise-card .card-header h5 {
-                margin-bottom: 0.75rem;
-            }
 
             /* Keep player selects side by side on mobile */
             .player-select {
@@ -129,55 +127,55 @@
 </head>
 
 <body>
-    <div class="container py-5">
-        <div class="card">
+    <div class="container-fluid py-4 px-4">
+        <div class="card mb-4">
             <div class="card-header gradient-bg">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4 class="mb-0"><i class="bi bi-clipboard-check"></i> Trainingsplan</h4>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4 class="mb-0 fs-5"><i class="bi bi-clipboard-check"></i> Trainingsplan</h4>
                     <div>
                         <button id="undoBtn" class="btn btn-light btn-sm me-2" onclick="undo()" disabled
                             title="Undo (Ctrl+Z)">
-                            <i class="bi bi-arrow-counterclockwise"></i> Undo
+                            <i class="bi bi-arrow-counterclockwise"></i>
                         </button>
                         <button id="redoBtn" class="btn btn-light btn-sm" onclick="redo()" disabled
                             title="Redo (Ctrl+Y)">
-                            <i class="bi bi-arrow-clockwise"></i> Redo
+                            <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
                 </div>
-                <div class="row text-center">
-                    <div class="col-md-6">
-                        <h2 class="display-6 mb-0"><i class="bi bi-people-fill"></i> <span
+                <div class="row text-center g-2">
+                    <div class="col-6">
+                        <h2 class="h5 mb-0"><i class="bi bi-people-fill"></i> <span
                                 th:text="${trainingPlan.playerCount}">0</span></h2>
-                        <p class="mb-0 opacity-75">Spieler</p>
+                        <small class="opacity-75">Spieler</small>
                     </div>
-                    <div class="col-md-6">
-                        <h2 class="display-6 mb-0"><i class="bi bi-list-check"></i> <span
+                    <div class="col-6">
+                        <h2 class="h5 mb-0"><i class="bi bi-list-check"></i> <span
                                 th:text="${trainingPlan.exercises.size()}">0</span></h2>
-                        <p class="mb-0 opacity-75">Übungen</p>
+                        <small class="opacity-75">Übungen</small>
                     </div>
                 </div>
             </div>
 
-            <div class="card-body">
+            <div class="card-body bg-light">
                 <!-- Exercise List -->
-                <div class="row g-4">
-                    <div class="col-12" th:each="exercise, exerciseStat : ${trainingPlan.exercises}">
+                <div class="row g-3">
+                    <div class="col-md-6 col-xl-4" th:each="exercise, exerciseStat : ${trainingPlan.exercises}">
                         <div class="card exercise-card" th:attr="data-exercise-index=${exerciseStat.index}">
                             <div class="card-header gradient-bg">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0 flex-grow-1" data-bs-toggle="collapse"
+                                    <h6 class="mb-0 flex-grow-1 small" data-bs-toggle="collapse"
                                         th:attr="data-bs-target='#exercise' + ${exerciseStat.index}"
-                                        style="cursor: pointer;">
-                                        <i class="bi bi-chevron-down collapse-icon me-2"></i>
+                                        style="cursor: pointer; font-size: 0.9rem;">
+                                        <i class="bi bi-chevron-down collapse-icon me-1"></i>
                                         <i class="bi bi-trophy"></i> Übung <span
                                             th:text="${exerciseStat.count}">1</span>
-                                    </h5>
+                                    </h6>
                                     <div class="btn-group" role="group">
-                                        <button class="btn btn-light btn-sm"
+                                        <button class="btn btn-outline-light btn-sm py-0 px-2"
                                             th:attr="data-exercise-index=${exerciseStat.index}"
-                                            onclick="toggleEditMode(this)">
-                                            <i class="bi bi-pencil"></i> Bearbeiten
+                                            onclick="toggleEditMode(this)" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
                                         </button>
                                         <button class="btn btn-warning btn-sm regenerate-btn" style="display: none;"
                                             th:attr="data-exercise-index=${exerciseStat.index},data-is-last=${exerciseStat.last}"

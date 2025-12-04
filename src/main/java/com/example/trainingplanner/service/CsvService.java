@@ -59,11 +59,10 @@ public class CsvService {
                 }
             }
 
-            System.out.println("Loaded " + players.size() + " players:");
             players.forEach(System.out::println);
             return players;
         } catch (IOException e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }
@@ -105,19 +104,19 @@ public class CsvService {
                         if (!date.isBefore(today)) {
                             dates.add(dateStr);
                         } else {
-                            System.out.println("Skipping past date: " + dateStr + " (" + date + ")");
+
                         }
                     } catch (DateTimeParseException e) {
                         // If parsing fails, include the date anyway
-                        System.out.println("Failed to parse date: " + dateStr + " - " + e.getMessage());
+
                         dates.add(dateStr);
                     }
                 }
             }
-            System.out.println("Found dates: " + dates);
+
             return dates;
         } catch (IOException e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }
@@ -169,7 +168,7 @@ public class CsvService {
             }
             return exercises;
         } catch (IOException e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }
@@ -198,7 +197,7 @@ public class CsvService {
             }
 
             if (dateColumnIndex == -1) {
-                System.out.println("Date not found: " + targetDate);
+
                 return new ArrayList<>();
             }
 
@@ -254,7 +253,7 @@ public class CsvService {
 
             return players;
         } catch (IOException e) {
-            e.printStackTrace();
+
             return new ArrayList<>();
         }
     }

@@ -73,8 +73,6 @@ public class TrainingPlanService {
             return new ArrayList<>();
         }
 
-        System.out.println("=== Elo-Optimized Round-Robin Pairing ===");
-        System.out.println("Players: " + numPlayers);
 
         // For round-robin, we need even number of players
         if (numPlayers % 2 != 0) {
@@ -135,7 +133,7 @@ public class TrainingPlanService {
             }
 
             if (!validRounds.isEmpty()) {
-                System.out.println("Filtered rounds: " + validRounds.size() + " (from " + allRounds.size() + ")");
+
                 allRounds = validRounds;
             } else {
                 System.err.println(
@@ -184,13 +182,10 @@ public class TrainingPlanService {
         if (validUnpaired < 0)
             validUnpaired = 0;
 
-        System.out.println("Requested unpaired: " + unpairedPlayersCount + ", Valid unpaired: " + validUnpaired);
-
         Map<Exercise, List<Player>> unpairedPlayers = new HashMap<>();
         Map<Exercise, List<PlayerPair>> exercisePairs;
 
         if (validUnpaired > 0) {
-            System.out.println("=== Rotating Unpaired Players (" + validUnpaired + ") ===");
 
             // Add dummy players
             List<Player> allPlayersWithDummy = new ArrayList<>(availablePlayers);
@@ -272,8 +267,7 @@ public class TrainingPlanService {
                     exercisePairs.put(exercise, realPairs);
                     if (!roundUnpaired.isEmpty()) {
                         unpairedPlayers.put(exercise, roundUnpaired);
-                        System.out.println("Exercise " + (selectedExercises.indexOf(exercise) + 1) + " - Unpaired: "
-                                + roundUnpaired.stream().map(Player::getName).collect(Collectors.joining(", ")));
+
                     }
                 }
             }
@@ -303,8 +297,6 @@ public class TrainingPlanService {
     public com.example.trainingplanner.dto.RegenerateResponse regenerateRemainingExercises(RegenerateRequest request) {
         int editedIndex = request.getExerciseIndex();
         List<Player> availablePlayers = request.getAvailablePlayers();
-
-        System.out.println("\n=== Regenerating Exercises After Index " + editedIndex + " ===");
 
         // Create exercises list
         int totalExercises = request.getCurrentPairings().size();
@@ -447,7 +439,7 @@ public class TrainingPlanService {
         }
 
         if (validRounds.isEmpty()) {
-            System.out.println("WARNING: No valid unique rounds found! Reusing all rounds.");
+
             validRounds.addAll(allRounds);
         }
 

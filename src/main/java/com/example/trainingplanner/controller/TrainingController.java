@@ -75,7 +75,7 @@ public class TrainingController {
             model.addAttribute("trainingPlan", session);
             return "plan";
         } catch (Exception e) {
-            e.printStackTrace();
+
             model.addAttribute("error", "Error generating plan: " + e.getMessage());
             return "index";
         }
@@ -87,4 +87,5 @@ public class TrainingController {
             @RequestBody RegenerateRequest request) {
         return trainingPlanService.regenerateRemainingExercises(request);
     }
+
 }
