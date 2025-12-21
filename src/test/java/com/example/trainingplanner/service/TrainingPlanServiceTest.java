@@ -7,8 +7,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -132,7 +135,10 @@ class TrainingPlanServiceTest {
         com.example.trainingplanner.dto.RegenerateResponse response = trainingPlanService
                 .regenerateRemainingExercises(request);
 
-        // Verify Ex 2 does NOT have A unpaired
+        // Verify Ex 2 has the NEXT best pairing
+        // In this case, since everyone has the same Elo, we expect it to pick the next
+        // unique round
+        // which, due to our tie-breaking, should result in a different unpaired player.
         List<Player> unpairedEx2 = response.getUnpairedPlayers().get("Exercise 2");
         assertNotNull(unpairedEx2);
         assertEquals(1, unpairedEx2.size());
@@ -171,6 +177,74 @@ class TrainingPlanServiceTest {
             assertTrue(unpairedNames.contains(p.getName()), "Player " + p.getName() + " should be unpaired once");
             assertEquals(1, java.util.Collections.frequency(unpairedNames, p.getName()),
                     "Player " + p.getName() + " should be unpaired exactly once");
+        }
+    }
+
+    @Test
+    void generatePlan_shouldHaveNoDuplicatePairs() throws Exception {
+        // Setup 6 players
+        List<Player> players = Arrays.asList(
+                new Player("A", 10), new Player("B", 10),
+                new Player("C", 10), new Player("D", 10),
+                new Player("E", 10), new Player("F", 10));
+        csvServiceStub.setPlayers(players);
+
+        // Generate plan with 3 exercises (max unique rounds for 6 players is 5 if we
+        // want zero overlap?)
+        // Total pairs = 6*5/2 = 15. Each exercise has 3 pairs.
+        // So we can have up to 5 exercises with zero overlap.
+        TrainingSession session = trainingPlanService.generatePlan(players, 4, 0);
+
+        assertNotNull(session);
+        assertEquals(4, session.getExercises().size());
+
+        Set<String> usedPairs = new HashSet<>();
+        for (com.example.trainingplanner.model.Exercise ex : session.getExercises()) {
+            List<com.example.trainingplanner.model.PlayerPair> pairs = session.getExercisePairs().get(ex);
+            for (com.example.trainingplanner.model.PlayerPair pair : pairs) {
+                String p1 = pair.getPlayer1().getName();
+                String p2 = pair.getPlayer2().getName();
+                String key = p1.compareTo(p2) < 0 ? p1 + "|" + p2 : p2 + "|" + p1;
+
+                assertFalse(usedPairs.contains(key), "Pair " + key + " is repeated in exercise " + ex.getName());
+                usedPairs.add(key);
+            }
+        }
+    }
+
+    @Test
+    void regenerateRemainingExercises_shouldRespectUniqueness() {
+        List<Player> players = Arrays.asList(
+                new Player("A", 10), new Player("B", 10),
+                new Player("C", 10), new Player("D", 10));
+
+        // Ex 1: A-B, C-D
+        com.example.trainingplanner.dto.RegenerateRequest request = new com.example.trainingplanner.dto.RegenerateRequest();
+        request.setExerciseIndex(0);
+        request.setAvailablePlayers(players);
+
+        Map<String, List<com.example.trainingplanner.dto.RegenerateRequest.PairDto>> current = new HashMap<>();
+        List<com.example.trainingplanner.dto.RegenerateRequest.PairDto> pairsEx1 = new ArrayList<>();
+        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("A", "B"));
+        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("C", "D"));
+        current.put("Exercise 1", pairsEx1);
+        current.put("Exercise 2", new ArrayList<>());
+        request.setCurrentPairings(current);
+
+        request.setUnpairedPlayers(new HashMap<>());
+
+        com.example.trainingplanner.dto.RegenerateResponse response = trainingPlanService
+                .regenerateRemainingExercises(request);
+
+        // Ex 2 pairs should NOT be A-B or C-D
+        List<com.example.trainingplanner.model.PlayerPair> pairsEx2 = response.getExercisePairs()
+                .get("Exercise 2");
+        for (com.example.trainingplanner.model.PlayerPair p : pairsEx2) {
+            String p1 = p.getPlayer1().getName();
+            String p2 = p.getPlayer2().getName();
+            String key = p1.compareTo(p2) < 0 ? p1 + "|" + p2 : p2 + "|" + p1;
+            assertNotEquals("A|B", key);
+            assertNotEquals("C|D", key);
         }
     }
 
