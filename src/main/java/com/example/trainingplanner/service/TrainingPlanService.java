@@ -254,197 +254,157 @@ public class TrainingPlanService {
         // Sort players by Elo (Klassierung) descending
         availablePlayers.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
 
-        // Generate custom number of generic exercises
-        List<Exercise> selectedExercises = new ArrayList<>();
-        for (int i = 1; i <= numberOfExercises; i++) {
-            Exercise exercise = new Exercise();
-            exercise.setName("Exercise " + i);
-            exercise.setDescription("");
-            exercise.setType("Generic");
-            exercise.setDurationMinutes(15);
-            selectedExercises.add(exercise);
-        }
+        // Prepare used pairings set
+        Set<Long> usedPairHashes = new HashSet<>();
 
-        int currentDuration = selectedExercises.size() * 15;
+        // Results storage
+        RoundWithScore[] bestRounds = new RoundWithScore[numberOfExercises];
 
-        TrainingSession session = new TrainingSession();
-        session.setTotalDuration(currentDuration);
-        session.setExercises(selectedExercises);
-        session.setPlayerCount(availablePlayers.size());
-        session.setNotes("Generated plan with " + selectedExercises.size() + " exercises.");
-
-        // Adjust unpaired count to ensure remaining players are even
+        // Prepare dummy players if needed
+        int totalPlayersNeeded = availablePlayers.size();
         int validUnpaired = unpairedPlayersCount;
-        if ((availablePlayers.size() - validUnpaired) % 2 != 0) {
+        if ((totalPlayersNeeded - validUnpaired) % 2 != 0) {
             validUnpaired++;
-            // If we exceeded player count, adjust down
-            if (validUnpaired > availablePlayers.size()) {
+            if (validUnpaired > totalPlayersNeeded)
                 validUnpaired -= 2;
-            }
         }
         if (validUnpaired < 0)
             validUnpaired = 0;
 
-        Map<Exercise, List<Player>> unpairedPlayers = new HashMap<>();
-        Map<Exercise, List<PlayerPair>> exercisePairs = new HashMap<>();
-        Set<String> usedGlobalPairKeys = new HashSet<>();
+        List<Player> poolWithDummies = new ArrayList<>(availablePlayers);
+        for (int i = 0; i < validUnpaired; i++) {
+            poolWithDummies.add(new Player("DUMMY_" + i, 0));
+        }
 
-        if (validUnpaired > 0) {
-            // Add dummy players
-            List<Player> allPlayersWithDummy = new ArrayList<>(availablePlayers);
-            for (int i = 0; i < validUnpaired; i++) {
-                allPlayersWithDummy.add(new Player("DUMMY_" + i, 0));
+        // Generate best round for each exercise sequentially
+        for (int e = 0; e < numberOfExercises; e++) {
+            RoundWithScore currentBest = findBestRoundForExercise(poolWithDummies, usedPairHashes);
+
+            if (currentBest == null || currentBest.pairs.isEmpty()) {
+                // If we can't find a unique round, we might need to reset or allow some
+                // overlaps
+                // For now, let's try clearing usedPairHashes as a last resort fallback
+                System.err.println("Warning: Falling back and clearing used pairs for Exercise " + (e + 1));
+                usedPairHashes.clear();
+                currentBest = findBestRoundForExercise(poolWithDummies, usedPairHashes);
             }
 
-            for (int i = 0; i < selectedExercises.size(); i++) {
-                Exercise exercise = selectedExercises.get(i);
-
-                // Generate a pool of rounds that are STRICTLY unique relative to history
-                List<RoundWithScore> allRounds = generateRounds(allPlayersWithDummy, validUnpaired, usedGlobalPairKeys);
-                boolean usingStrictPool = !allRounds.isEmpty();
-
-                if (!usingStrictPool) {
-                    // Fallback: No strictly unique rounds found in the sample
-                    allRounds = generateRounds(allPlayersWithDummy, validUnpaired, Collections.emptySet());
+            if (currentBest != null) {
+                bestRounds[e] = currentBest;
+                // Accumulate used pairs
+                for (PlayerPair p : currentBest.pairs) {
+                    usedPairHashes.add(getPairHashForPair(p));
                 }
-
-                List<RoundWithScore> availableRounds = new ArrayList<>(allRounds);
-
-                // Strictly Uniqueness-aware selection:
-                // Find the first round in the sorted list that has ZERO overlap
-                RoundWithScore bestRound = null;
-                int actualOverlap = 0;
-                for (RoundWithScore round : availableRounds) {
-                    boolean hasOverlap = false;
-                    for (PlayerPair pair : round.pairs) {
-                        if (usedGlobalPairKeys.contains(getPairKey(pair))) {
-                            hasOverlap = true;
-                            break;
-                        }
-                    }
-                    if (!hasOverlap) {
-                        bestRound = round;
-                        break;
-                    }
-                }
-
-                // Fallback: If no round with zero overlap exists, pick the one with minimal
-                // overlap
-                if (bestRound == null) {
-                    int minOverlap = Integer.MAX_VALUE;
-                    for (RoundWithScore round : availableRounds) {
-                        int overlap = 0;
-                        for (PlayerPair pair : round.pairs) {
-                            if (usedGlobalPairKeys.contains(getPairKey(pair)))
-                                overlap++;
-                        }
-                        if (overlap < minOverlap) {
-                            minOverlap = overlap;
-                            bestRound = round;
-                        }
-                        if (minOverlap == 1)
-                            break; // Optimization
-                    }
-                    actualOverlap = minOverlap;
-                    System.out.println("Warning: Could not find unique round for " + exercise.getName()
-                            + ". Fallback to overlap: " + actualOverlap);
-                } else {
-                    System.out.println("Success: Found unique round for " + exercise.getName());
-                }
-
-                // Update state
-                availableRounds.remove(bestRound);
-                for (PlayerPair pair : bestRound.pairs) {
-                    usedGlobalPairKeys.add(getPairKey(pair));
-                }
-
-                List<PlayerPair> realPairs = new ArrayList<>();
-                List<Player> roundUnpaired = new ArrayList<>();
-
-                for (PlayerPair pair : bestRound.pairs) {
-                    boolean p1Dummy = pair.getPlayer1().getName().startsWith("DUMMY");
-                    boolean p2Dummy = pair.getPlayer2().getName().startsWith("DUMMY");
-
-                    if (p1Dummy && !p2Dummy) {
-                        roundUnpaired.add(pair.getPlayer2());
-                    } else if (!p1Dummy && p2Dummy) {
-                        roundUnpaired.add(pair.getPlayer1());
-                    } else if (!p1Dummy && !p2Dummy) {
-                        realPairs.add(pair);
-                    }
-                }
-
-                exercisePairs.put(exercise, realPairs);
-                if (!roundUnpaired.isEmpty()) {
-                    unpairedPlayers.put(exercise, roundUnpaired);
-                }
-            }
-        } else {
-            // Even number - all players participate in all exercises
-            for (int i = 0; i < selectedExercises.size(); i++) {
-                Exercise exercise = selectedExercises.get(i);
-
-                // Generate a pool of rounds that are STRICTLY unique relative to history
-                List<RoundWithScore> allRounds = generateRounds(availablePlayers, 0, usedGlobalPairKeys);
-                boolean usingStrictPool = !allRounds.isEmpty();
-
-                if (!usingStrictPool) {
-                    // Fallback
-                    allRounds = generateRounds(availablePlayers, 0, Collections.emptySet());
-                }
-
-                List<RoundWithScore> availableRounds = new ArrayList<>(allRounds);
-
-                RoundWithScore bestRound = null;
-                int actualOverlap = 0;
-                for (RoundWithScore round : availableRounds) {
-                    boolean hasOverlap = false;
-                    for (PlayerPair pair : round.pairs) {
-                        if (usedGlobalPairKeys.contains(getPairKey(pair))) {
-                            hasOverlap = true;
-                            break;
-                        }
-                    }
-                    if (!hasOverlap) {
-                        bestRound = round;
-                        break;
-                    }
-                }
-
-                if (bestRound == null) {
-                    int minOverlap = Integer.MAX_VALUE;
-                    for (RoundWithScore round : availableRounds) {
-                        int overlap = 0;
-                        for (PlayerPair pair : round.pairs) {
-                            if (usedGlobalPairKeys.contains(getPairKey(pair)))
-                                overlap++;
-                        }
-                        if (overlap < minOverlap) {
-                            minOverlap = overlap;
-                            bestRound = round;
-                        }
-                    }
-                    actualOverlap = minOverlap;
-                    System.out.println("Warning: Could not find unique round for " + exercise.getName()
-                            + ". Fallback to overlap: " + actualOverlap);
-                } else {
-                    System.out.println("Success: Found unique round for " + exercise.getName());
-                }
-
-                availableRounds.remove(bestRound);
-                for (PlayerPair pair : bestRound.pairs) {
-                    usedGlobalPairKeys.add(getPairKey(pair));
-                }
-
-                exercisePairs.put(exercise, bestRound.pairs);
             }
         }
 
-        session.setExercisePairs(exercisePairs);
-        session.setUnpairedPlayers(unpairedPlayers);
+        // Assemble TrainingSession
+        TrainingSession session = new TrainingSession();
+        session.setTotalDuration(numberOfExercises * 15);
+        session.setPlayerCount(availablePlayers.size());
         session.setAvailablePlayers(availablePlayers);
 
+        List<Exercise> exercises = new ArrayList<>();
+        Map<Exercise, List<PlayerPair>> exercisePairs = new HashMap<>();
+        Map<Exercise, List<Player>> exerciseUnpaired = new HashMap<>();
+
+        for (int i = 0; i < numberOfExercises; i++) {
+            Exercise ex = new Exercise("Exercise " + (i + 1), "", "Generic", 15);
+            exercises.add(ex);
+
+            if (bestRounds[i] != null) {
+                List<PlayerPair> realPairs = new ArrayList<>();
+                List<Player> unpaired = new ArrayList<>();
+                for (PlayerPair p : bestRounds[i].pairs) {
+                    boolean p1Dummy = p.getPlayer1().getName().startsWith("DUMMY");
+                    boolean p2Dummy = p.getPlayer2().getName().startsWith("DUMMY");
+
+                    if (p1Dummy && !p2Dummy)
+                        unpaired.add(p.getPlayer2());
+                    else if (!p1Dummy && p2Dummy)
+                        unpaired.add(p.getPlayer1());
+                    else if (!p1Dummy && !p2Dummy)
+                        realPairs.add(p);
+                }
+                exercisePairs.put(ex, realPairs);
+                if (!unpaired.isEmpty())
+                    exerciseUnpaired.put(ex, unpaired);
+            }
+        }
+
+        session.setExercises(exercises);
+        session.setExercisePairs(exercisePairs);
+        session.setUnpairedPlayers(exerciseUnpaired);
+        session.setNotes("Generated optimized plan with " + numberOfExercises + " exercises.");
+
         return session;
+    }
+
+    private RoundWithScore findBestRoundForExercise(List<Player> players, Set<Long> usedPairHashes) {
+        BestRoundTracker tracker = new BestRoundTracker();
+        backtrackForRound(new ArrayList<>(players), new ArrayList<>(), 0, usedPairHashes, tracker);
+        return tracker.bestRound;
+    }
+
+    private static class BestRoundTracker {
+        RoundWithScore bestRound = null;
+        int bestScore = Integer.MAX_VALUE;
+    }
+
+    private void backtrackForRound(List<Player> remaining, List<PlayerPair> currentPairs, int currentTotalDiff,
+            Set<Long> usedPairHashes, BestRoundTracker tracker) {
+        // Pruning: if current total diff is already worse than best found, stop
+        if (currentTotalDiff >= tracker.bestScore) {
+            return;
+        }
+
+        if (remaining.isEmpty()) {
+            tracker.bestScore = currentTotalDiff;
+            tracker.bestRound = new RoundWithScore(new ArrayList<>(currentPairs), currentTotalDiff);
+            return;
+        }
+
+        Player p1 = remaining.remove(0);
+
+        for (int i = 0; i < remaining.size(); i++) {
+            Player p2 = remaining.get(i);
+            long hash = getPairHash(p1, p2);
+
+            // Pruning: skip if pair already used in previous exercises
+            if (usedPairHashes.contains(hash)) {
+                continue;
+            }
+
+            int pairDiff = 0;
+            if (!p1.getName().startsWith("DUMMY") && !p2.getName().startsWith("DUMMY")) {
+                pairDiff = Math.abs(p1.getKlassierung() - p2.getKlassierung());
+            }
+
+            // Pruning: local check if this pair would exceed best score
+            if (currentTotalDiff + pairDiff >= tracker.bestScore) {
+                continue;
+            }
+
+            remaining.remove(i);
+            currentPairs.add(new PlayerPair(p1, p2));
+
+            backtrackForRound(remaining, currentPairs, currentTotalDiff + pairDiff, usedPairHashes, tracker);
+
+            // Backtrack
+            currentPairs.remove(currentPairs.size() - 1);
+            remaining.add(i, p2);
+
+            // Optimization: if we found a perfect score (0), we can stop searching this
+            // branch early
+            if (tracker.bestScore == 0 && remaining.size() > 0) {
+                // Note: we might want to continue to find *variety* but the requirement focuses
+                // on best pairing
+                // For perfectionists, we keep searching, but for efficiency, 0 is the floor.
+                // However, backtracking continue pick different p2 for p1.
+            }
+        }
+
+        remaining.add(0, p1);
     }
 
     /**
