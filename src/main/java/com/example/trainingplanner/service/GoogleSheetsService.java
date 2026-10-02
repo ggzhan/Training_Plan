@@ -20,7 +20,8 @@ import java.util.Map;
 @Service
 public class GoogleSheetsService {
 
-    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/1gbevNRuWtom10K-bJVvTUc9MuD5i6SaH2BdrFoKWw0I/gviz/tq?tqx=out:json";
+    // The "Klassierung, Name, <dates>" header sits on row 8, below the location/legend rows
+    private static final String SHEETS_URL = "https://docs.google.com/spreadsheets/d/1eMKvroU-GRNI3SszjwAQxxVhSEHeV0b4sjFYNh1BFmo/gviz/tq?tqx=out:json&range=A8:Z&headers=1";
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -105,7 +106,9 @@ public class GoogleSheetsService {
             try {
                 // Parse the date string (format: "d. MMMM")
                 // We need to add a year to parse it properly
-                LocalDate trainingDate = LocalDate.parse(dateStr + " " + currentYear,
+                // Drop location suffixes such as "15. Mai (SG)"
+                String plainDate = dateStr.replaceAll("\\s*\\(.*\\)\\s*$", "");
+                LocalDate trainingDate = LocalDate.parse(plainDate + " " + currentYear,
                         DateTimeFormatter.ofPattern("d. MMMM yyyy", java.util.Locale.GERMAN));
 
                 // If the date is in the past, assume it's for next year
