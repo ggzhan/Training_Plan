@@ -7,6 +7,8 @@ public class TrainingPlan {
     private String trainingDate;
     private PlanSettings settings;
     private List<Player> players = new ArrayList<>();
+    // Kids marked absent on the plan page; kept so they can be marked present again
+    private List<Player> absent = new ArrayList<>();
     private List<ExerciseRound> exercises = new ArrayList<>();
     // Rules the generator had to bend, e.g. a kid at a Balleimer twice
     private List<String> warnings = new ArrayList<>();
@@ -33,6 +35,14 @@ public class TrainingPlan {
 
     public void setPlayers(List<Player> players) {
         this.players = players;
+    }
+
+    public List<Player> getAbsent() {
+        return absent;
+    }
+
+    public void setAbsent(List<Player> absent) {
+        this.absent = absent;
     }
 
     public List<ExerciseRound> getExercises() {

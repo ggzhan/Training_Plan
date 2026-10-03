@@ -186,4 +186,26 @@ class TrainingPlanServiceTest {
             round.getPairs().forEach(p -> assertTrue(pairs.add(pairKey(p)), pairKey(p) + " repeats"));
         }
     }
+
+    @Test
+    void regenerateWithChangedAttendancePlansOnlyTheKidsWhoAreThere() {
+        List<Player> players = kids(12);
+        TrainingPlanService service = new TrainingPlanService(new Random(9));
+        TrainingPlan plan = service.generatePlan(players, settings(5, 1, 2, "Trainer A"), "3. Oktober");
+
+        // Kind 0 went home after Übung 2, a late kid arrived
+        List<Player> present = new ArrayList<>(players.subList(1, players.size()));
+        present.add(new Player("Spät", 4));
+        plan.setPlayers(present);
+        TrainingPlan adjusted = service.regenerateFrom(plan, 1);
+
+        assertEquals(5, adjusted.getExercises().size());
+        for (int e = 2; e < 5; e++) {
+            List<String> names = namesIn(adjusted.getExercises().get(e));
+            assertFalse(names.contains("Kind 0"), "absent kid still planned in exercise " + (e + 1));
+            assertTrue(names.contains("Spät"), "late kid missing in exercise " + (e + 1));
+            assertEquals(12, names.size());
+        }
+        assertTrue(namesIn(adjusted.getExercises().get(0)).contains("Kind 0"));
+    }
 }

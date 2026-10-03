@@ -1,14 +1,12 @@
 package com.example.trainingplanner.controller;
 
+import com.example.trainingplanner.dto.GenerateRequest;
 import com.example.trainingplanner.dto.RegenerateRequest;
-import com.example.trainingplanner.model.PlanSettings;
 import com.example.trainingplanner.model.Player;
 import com.example.trainingplanner.model.TrainingPlan;
 import com.example.trainingplanner.service.GoogleSheetsService;
 import com.example.trainingplanner.service.PdfExportService;
 import com.example.trainingplanner.service.TrainingPlanService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,7 +29,6 @@ public class TrainingController {
     private final TrainingPlanService trainingPlanService;
     private final GoogleSheetsService googleSheetsService;
     private final PdfExportService pdfExportService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TrainingController(TrainingPlanService trainingPlanService,
                               GoogleSheetsService googleSheetsService,
@@ -64,39 +61,19 @@ public class TrainingController {
                 "lastRefresh", String.valueOf(googleSheetsService.getLastRefreshTime()));
     }
 
-    @PostMapping("/generate-plan")
-    public String generatePlan(@RequestParam("trainingDate") String trainingDate,
-            @RequestParam(value = "numberOfExercises", defaultValue = "6") int numberOfExercises,
-            @RequestParam(value = "balleimerCount", defaultValue = "0") int balleimerCount,
-            @RequestParam(value = "playersPerBalleimer", defaultValue = "2") int playersPerBalleimer,
-            @RequestParam(value = "sparringPartnersJson", required = false) String sparringPartnersJson,
-            @RequestParam(value = "playersJson", required = false) String playersJson,
-            Model model) {
-        try {
-            List<Player> players = playersJson != null && !playersJson.isEmpty()
-                    ? objectMapper.readValue(playersJson, new TypeReference<List<Player>>() {
-                    })
-                    : googleSheetsService.readPlayersForDate(trainingDate);
-            List<String> sparringPartners = sparringPartnersJson != null && !sparringPartnersJson.isEmpty()
-                    ? objectMapper.readValue(sparringPartnersJson, new TypeReference<List<String>>() {
-                    })
-                    : List.of();
+    @GetMapping("/plan")
+    public String plan() {
+        // The plan itself lives in the browser; plan.js reads it from storage
+        return "plan";
+    }
 
-            PlanSettings settings = new PlanSettings(numberOfExercises, balleimerCount, playersPerBalleimer,
-                    sparringPartners);
-            TrainingPlan plan = trainingPlanService.generatePlan(players, settings, trainingDate);
-            model.addAttribute("planJson", objectMapper.writeValueAsString(plan));
-            return "plan";
-        } catch (Exception e) {
-            // Back to the entry page with the same date and the hand-edited player list
-            model.addAttribute("error", e instanceof IllegalArgumentException
-                    ? e.getMessage()
-                    : "Fehler beim Erstellen des Plans: " + e.getMessage());
-            model.addAttribute("trainingDates", googleSheetsService.getTrainingDates());
-            model.addAttribute("defaultDate", trainingDate);
-            model.addAttribute("playersJson", playersJson);
-            return "index";
-        }
+    @PostMapping("/api/generate-plan")
+    @ResponseBody
+    public TrainingPlan generatePlan(@RequestBody GenerateRequest request) {
+        List<Player> players = request.getPlayers() != null && !request.getPlayers().isEmpty()
+                ? request.getPlayers()
+                : googleSheetsService.readPlayersForDate(request.getTrainingDate());
+        return trainingPlanService.generatePlan(players, request.getSettings(), request.getTrainingDate());
     }
 
     @PostMapping("/api/regenerate-exercises")

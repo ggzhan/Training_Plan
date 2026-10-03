@@ -1,261 +1,156 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stützpunkt Trainingstool</title>
-
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Trainingsplaner</title>
+    <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-
-    <style>
-        :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --primary-color: #667eea;
-            --primary-dark: #764ba2;
-        }
-
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .gradient-bg {
-            background: var(--primary-gradient);
-            color: white;
-        }
-
-        .btn-gradient {
-            background: var(--primary-gradient);
-            border: none;
-            color: white;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .btn-gradient:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-
-        .card {
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            border-radius: 15px;
-        }
-
-        .table-container {
-            max-height: 400px;
-            overflow-y: auto;
-            border-radius: 10px;
-        }
-
-        .table thead {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        /* Collapsible chevron animation */
-        .collapse-icon {
-            transition: transform 0.3s ease;
-        }
-
-        [data-bs-toggle="collapse"]:not(.collapsed) .collapse-icon {
-            transform: rotate(180deg);
-        }
-
-        /* Mobile button spacing */
-        @media (max-width: 768px) {
-            .modal-footer .btn {
-                margin: 0.25rem 0;
-            }
-
-            .table .btn-group {
-                gap: 0.5rem;
-            }
-
-            .card-header .btn {
-                margin-top: 0.5rem;
-            }
-
-            .d-flex.justify-content-between {
-                flex-direction: column;
-                gap: 0.75rem;
-            }
-
-            .d-flex.justify-content-between .btn {
-                width: 100%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/app.css(v=1)}">
 </head>
 
 <body>
-    <div class="container py-5">
-        <div class="card">
-            <div class="card-header gradient-bg">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h1 class="mb-1"><i class="bi bi-calendar-check"></i> Trainingsplaner</h1>
-                        <p class="mb-0 opacity-75">Automatisch Trainingseinteilung generieren</p>
-                    </div>
-                    <button type="button" onclick="refreshData()" id="refreshBtn" class="btn btn-light">
-                        <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
-                    </button>
-                </div>
-            </div>
+    <header class="topbar page-narrow">
+        <h1>Trainingsplaner</h1>
+        <a href="/plan" id="lastPlanLink" class="btn btn-quiet" hidden>
+            <i class="bi bi-clipboard-check" aria-hidden="true"></i> <span>Letzter Plan</span>
+        </a>
+    </header>
 
-            <div class="card-body">
-                <div th:if="${error}" class="alert alert-danger" role="alert">
-                    <i class="bi bi-exclamation-triangle"></i> <span th:text="${error}"></span>
-                </div>
+    <form id="planForm" novalidate>
+        <main class="page page-narrow">
+            <div id="formError" class="notice notice-danger" role="alert" hidden></div>
 
-                <form id="planForm" action="/generate-plan" method="post">
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label for="trainingDate" class="form-label fw-bold">
-                                <i class="bi bi-calendar3"></i> Trainingsdatum
-                            </label>
-                            <select id="trainingDate" name="trainingDate" class="form-select" required>
-                                <option th:each="date : ${trainingDates}" th:value="${date}" th:text="${date}"
-                                    th:selected="${date == defaultDate}">Datum</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="numberOfExercises" class="form-label fw-bold">
-                                <i class="bi bi-list-ol"></i> Anzahl der Übungen
-                            </label>
-                            <input type="number" id="numberOfExercises" name="numberOfExercises" class="form-control"
-                                min="1" max="10" value="6" required>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <label for="balleimerCount" class="form-label fw-bold">
-                                <i class="bi bi-basket"></i> Balleimer
-                            </label>
-                            <input type="number" class="form-control" id="balleimerCount" name="balleimerCount"
-                                value="0" min="0" max="6" required>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <label for="playersPerBalleimer" class="form-label fw-bold">
-                                <i class="bi bi-people"></i> Kinder pro Balleimer
-                            </label>
-                            <input type="number" class="form-control" id="playersPerBalleimer"
-                                name="playersPerBalleimer" value="2" min="1" max="6" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="sparringName" class="form-label fw-bold">
-                                <i class="bi bi-person-badge"></i> Sparringpartner
-                            </label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="sparringName"
-                                    placeholder="Name, z.B. Trainer" autocomplete="off">
-                                <button type="button" class="btn btn-outline-secondary" onclick="addSparringPartner()">
-                                    <i class="bi bi-plus-circle"></i> Hinzufügen
-                                </button>
-                            </div>
-                            <div id="sparringList" class="d-flex flex-wrap gap-2 mt-2"></div>
-                        </div>
-
-                        <div class="col-12">
-                            <div id="stationSummary" class="form-text"></div>
-                        </div>
-                    </div>
-
-                    <input type="hidden" id="playersJson" name="playersJson">
-                    <input type="hidden" id="sparringPartnersJson" name="sparringPartnersJson">
-
-                    <!-- Player Management Section -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0" data-bs-toggle="collapse" data-bs-target="#playerListCollapse"
-                                style="cursor: pointer;">
-                                <i class="bi bi-chevron-down collapse-icon me-2"></i>
-                                <i class="bi bi-people"></i> Spieler
-                                <span class="badge gradient-bg" id="playerCount">0</span>
-                            </h5>
-                            <button type="button" class="btn btn-gradient btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#playerModal" onclick="openAddPlayerModal()">
-                                <i class="bi bi-plus-circle"></i> Spieler hinzufügen
-                            </button>
-                        </div>
-
-                        <div class="collapse show" id="playerListCollapse">
-                            <div class="table-container border rounded">
-                                <table class="table table-hover mb-0">
-                                    <thead class="gradient-bg">
-                                        <tr>
-                                            <th onclick="sortPlayers('name')" style="cursor: pointer;">
-                                                Name <i id="sortIcon-name" class="bi bi-arrow-down-up"></i>
-                                            </th>
-                                            <th class="text-center" onclick="sortPlayers('klassierung')"
-                                                style="cursor: pointer;">
-                                                Klassierung <i id="sortIcon-klassierung"
-                                                    class="bi bi-arrow-down-up"></i>
-                                            </th>
-                                            <th class="text-end">Aktionen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="playerListBody">
-                                        <!-- Players populated via JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" id="generateBtn" class="btn btn-gradient btn-lg">
-                            <i class="bi bi-play-circle"></i> Trainingsplan generieren
+            <section class="panel">
+                <div class="field">
+                    <label for="trainingDate" class="field-label">Training</label>
+                    <div class="inline">
+                        <select id="trainingDate" class="control" required>
+                            <option th:each="date : ${trainingDates}" th:value="${date}" th:text="${date}"
+                                th:selected="${date == defaultDate}">Datum</option>
+                        </select>
+                        <button type="button" id="refreshBtn" class="btn btn-secondary btn-icon"
+                            aria-label="Anmeldungen neu aus dem Sheet laden" title="Neu aus dem Sheet laden">
+                            <i class="bi bi-cloud-download" aria-hidden="true"></i>
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Player Modal -->
-    <div class="modal fade" id="playerModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header gradient-bg">
-                    <h5 class="modal-title" id="modalTitle">Spieler hinzufügen</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="playerName" class="form-label fw-bold">Name</label>
-                        <input type="text" class="form-control" id="playerName" placeholder="Spielername eingeben">
-                    </div>
-                    <div class="mb-3">
-                        <label for="playerKlassierung" class="form-label fw-bold">Klassierung (1-21)</label>
-                        <input type="number" class="form-control" id="playerKlassierung" min="1" max="21" value="1">
-                    </div>
+            </section>
 
+            <section class="panel" aria-labelledby="playersHeading">
+                <div class="panel-head">
+                    <h2 id="playersHeading">Kinder <span id="playerCount" class="count">0</span></h2>
+                    <button type="button" id="togglePlayers" class="btn btn-quiet" aria-expanded="false"
+                        aria-controls="playerList">Liste zeigen</button>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="button" class="btn btn-gradient" onclick="savePlayer()">
-                        <i class="bi bi-check-circle"></i> Speichern
+                <p id="rosterNote" class="hint" hidden>
+                    Von Hand angepasst.
+                    <button type="button" id="resetRoster" class="btn btn-quiet">Aus dem Sheet neu laden</button>
+                </p>
+
+                <div id="playerList" hidden>
+                    <div class="sortbar" role="group" aria-label="Sortieren">
+                        <span>Sortieren:</span>
+                        <button type="button" class="btn" data-sort="name" aria-pressed="true">Name</button>
+                        <button type="button" class="btn" data-sort="klassierung" aria-pressed="false">Klassierung</button>
+                    </div>
+                    <ul id="playerListBody" class="player-list"></ul>
+                    <button type="button" id="addPlayerBtn" class="btn btn-secondary btn-block">
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Kind hinzufügen
                     </button>
                 </div>
+            </section>
+
+            <section class="panel" aria-labelledby="setupHeading">
+                <h2 id="setupHeading">Einteilung</h2>
+
+                <div class="stepper-row">
+                    <label for="numberOfExercises">Übungen</label>
+                    <div class="stepper">
+                        <button type="button" class="btn" data-step="-1" data-for="numberOfExercises"
+                            aria-label="Eine Übung weniger">−</button>
+                        <input type="number" id="numberOfExercises" inputmode="numeric" min="1" max="12" value="6">
+                        <button type="button" class="btn" data-step="1" data-for="numberOfExercises"
+                            aria-label="Eine Übung mehr">+</button>
+                    </div>
+                </div>
+                <div class="stepper-row">
+                    <label for="balleimerCount">Balleimer</label>
+                    <div class="stepper">
+                        <button type="button" class="btn" data-step="-1" data-for="balleimerCount"
+                            aria-label="Ein Balleimer weniger">−</button>
+                        <input type="number" id="balleimerCount" inputmode="numeric" min="0" max="6" value="0">
+                        <button type="button" class="btn" data-step="1" data-for="balleimerCount"
+                            aria-label="Ein Balleimer mehr">+</button>
+                    </div>
+                </div>
+                <div class="stepper-row">
+                    <label for="playersPerBalleimer">Kinder pro Balleimer</label>
+                    <div class="stepper">
+                        <button type="button" class="btn" data-step="-1" data-for="playersPerBalleimer"
+                            aria-label="Ein Kind weniger pro Balleimer">−</button>
+                        <input type="number" id="playersPerBalleimer" inputmode="numeric" min="1" max="6" value="2">
+                        <button type="button" class="btn" data-step="1" data-for="playersPerBalleimer"
+                            aria-label="Ein Kind mehr pro Balleimer">+</button>
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top: var(--space-4);">
+                    <label for="sparringName" class="field-label">Sparringpartner</label>
+                    <span class="field-help" id="sparringHelp">Trainer oder Helfer, die pro Übung mit einem Kind
+                        spielen.</span>
+                    <div class="inline">
+                        <input type="text" id="sparringName" class="control" placeholder="Name" autocomplete="off"
+                            enterkeyhint="done" aria-describedby="sparringHelp">
+                        <button type="button" id="addSparringBtn" class="btn btn-secondary">Hinzufügen</button>
+                    </div>
+                    <div id="sparringList" class="chips" aria-label="Sparringpartner"></div>
+                </div>
+            </section>
+        </main>
+
+        <div class="actionbar">
+            <div class="actionbar-inner">
+                <p id="stationSummary" class="summary" aria-live="polite"></p>
+                <button type="button" id="fixSuggestion" class="btn btn-secondary btn-wrap" hidden></button>
+                <button type="submit" id="generateBtn" class="btn btn-primary btn-lg">Plan erstellen</button>
             </div>
         </div>
-    </div>
+    </form>
 
-    <!-- Bootstrap 5 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script th:inline="javascript">
-        // Set when the server sent the form back with an error, so hand edits survive
-        const RETURNED_PLAYERS_JSON = /*[[${playersJson}]]*/ null;
-    </script>
-    <script th:src="@{/js/index.js(v=1)}"></script>
+    <dialog id="playerDialog" class="sheet" aria-labelledby="playerDialogTitle">
+        <form method="dialog" id="playerForm">
+            <div class="sheet-head">
+                <h2 id="playerDialogTitle">Kind hinzufügen</h2>
+                <button type="button" class="btn btn-icon btn-quiet" id="closePlayerDialog" aria-label="Schliessen">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <div class="field">
+                    <label for="playerName" class="field-label">Name</label>
+                    <input type="text" class="control" id="playerName" autocomplete="off" required>
+                </div>
+                <div class="field">
+                    <label for="playerKlassierung" class="field-label">Klassierung</label>
+                    <span class="field-help" id="klassierungHelp">1 bis 21, höher heisst stärker.</span>
+                    <input type="number" class="control" id="playerKlassierung" inputmode="numeric" min="1"
+                        max="21" value="1" aria-describedby="klassierungHelp">
+                </div>
+                <p id="playerError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-4);"></p>
+            </div>
+            <div class="sheet-foot">
+                <button type="button" class="btn btn-secondary" id="cancelPlayer">Abbrechen</button>
+                <button type="submit" class="btn btn-primary" id="savePlayerBtn">Speichern</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
+
+    <script th:src="@{/js/common.js(v=1)}"></script>
+    <script th:src="@{/js/index.js(v=2)}"></script>
 </body>
 
 </html>

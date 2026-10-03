@@ -1,28 +1,75 @@
-// Plan page: renders PLAN, edits one exercise at a time, undo/redo, regenerate, PDF.
+// Plan page: shows the stored plan, edits one exercise at a time, adjusts the
+// plan to who is actually there, undo/redo, PDF.
 //
 // Every kid has exactly one place per exercise (pair, Balleimer, sparring or
 // ohne Partner). Editing changes a place by swapping with whoever holds the chosen
-// kid, so an exercise always stays complete.
+// kid, so an exercise always stays complete. The plan is saved in the browser
+// after every change, so reload and back never lose it.
 
-const plan = PLAN;
+let plan = readStored(STORAGE_KEYS.plan);
 let editingIndex = null;
 let draft = null; // copy of the exercise being edited
 let historyStack = [];
 let redoStack = [];
-let regenerating = false;
+let busy = false;
+let currentIndex = 0; // exercise nearest the top of the screen
+let attendance = null; // {present: Set of names, added: [players]} while the panel is open
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+const $ = (id) => document.getElementById(id);
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
+function savePlan() {
+    if (!writeStored(STORAGE_KEYS.plan, plan)) {
+        toast('Der Browser speichert nicht – beim Neuladen geht der Plan verloren.');
+    }
+}
+
 function playerByName(name) {
     return plan.players.find(p => p.name === name);
+}
+
+function exerciseLabel(n) {
+    return `Übung ${n}`;
+}
+
+// ===== HISTORY =====
+// Snapshots include the kids, since adjusting attendance changes them
+function snapshot() {
+    return clone({ players: plan.players, absent: plan.absent || [], exercises: plan.exercises });
+}
+
+function restore(state) {
+    plan.players = state.players;
+    plan.absent = state.absent;
+    plan.exercises = state.exercises;
+}
+
+function pushHistory() {
+    historyStack.push(snapshot());
+    redoStack = [];
+}
+
+function undo() {
+    if (historyStack.length === 0 || busy) return;
+    cancelEdit();
+    redoStack.push(snapshot());
+    restore(historyStack.pop());
+    savePlan();
+    render();
+    toast('Rückgängig gemacht');
+}
+
+function redo() {
+    if (redoStack.length === 0 || busy) return;
+    cancelEdit();
+    historyStack.push(snapshot());
+    restore(redoStack.pop());
+    savePlan();
+    render();
+    toast('Wiederhergestellt');
 }
 
 // ===== PLACES =====
@@ -53,7 +100,11 @@ function changeSlot(slotIndex, name) {
     const holder = slots.find((s, i) => i !== slotIndex && s.get().name === name);
     target.set(chosen);
     if (holder) holder.set(previous);
-    render();
+    renderExercises();
+    // Keep focus on the select that was just changed
+    const again = document.querySelector(`select[data-slot="${slotIndex}"]`);
+    if (again) again.focus();
+    if (holder) toast(`${previous.name} und ${name} getauscht`);
 }
 
 // ===== RULE HINTS =====
@@ -63,7 +114,7 @@ function hintsFor(index, ex) {
     const pairKey = (a, b) => [a, b].sort().join('\u0000');
     for (let e = 0; e < index; e++) {
         const earlier = plan.exercises[e];
-        const label = `Übung ${e + 1}`;
+        const label = exerciseLabel(e + 1);
         const earlierPairs = new Set(earlier.pairs.map(p => pairKey(p.player1.name, p.player2.name)));
         ex.pairs.forEach(p => {
             if (earlierPairs.has(pairKey(p.player1.name, p.player2.name))) {
@@ -87,211 +138,362 @@ function hintsFor(index, ex) {
     return hints;
 }
 
+function hintsHtml(index, ex) {
+    const hints = hintsFor(index, ex);
+    if (hints.length === 0) return '';
+    return `<div class="notice notice-danger hints"><ul>${hints.map(h => `<li>${escapeHtml(h)}</li>`).join('')}</ul></div>`;
+}
+
 // ===== RENDERING =====
 function render() {
-    document.getElementById('planDate').textContent = plan.trainingDate ? `· ${plan.trainingDate}` : '';
-    document.getElementById('playerCount').textContent = plan.players.length;
-    document.getElementById('exerciseCount').textContent = plan.exercises.length;
+    if (!plan || !Array.isArray(plan.exercises)) {
+        $('emptyState').hidden = false;
+        $('planMeta').textContent = '';
+        return;
+    }
+    plan.absent = plan.absent || [];
 
+    $('planTitle').textContent = plan.trainingDate ? `Training ${plan.trainingDate}` : 'Trainingsplan';
+    document.title = plan.trainingDate ? `Trainingsplan ${plan.trainingDate}` : 'Trainingsplan';
     const s = plan.settings;
-    const summary = [];
-    if (s.balleimerCount > 0) summary.push(`Balleimer: ${s.balleimerCount} × ${s.playersPerBalleimer} Kinder`);
-    if (s.sparringPartners.length > 0) summary.push(`Sparring: ${s.sparringPartners.join(', ')}`);
-    document.getElementById('settingsSummary').textContent = summary.join(' · ');
+    const meta = [`${plan.players.length} Kinder`];
+    if (s.balleimerCount > 0) meta.push(`${s.balleimerCount} Balleimer à ${s.playersPerBalleimer}`);
+    if (s.sparringPartners.length > 0) meta.push(`Sparring: ${s.sparringPartners.join(', ')}`);
+    $('planMeta').textContent = meta.join(' · ');
 
-    const container = document.getElementById('exercises');
+    $('attendance').hidden = false;
+    $('actionbar').hidden = false;
+    $('exnav').hidden = false;
+
+    renderNav();
+    renderAttendance();
+    renderExercises();
+    renderBar();
+}
+
+function renderNav() {
+    const nav = $('exnavInner');
+    nav.innerHTML = plan.exercises.map((_, i) =>
+        `<a href="#ex-${i + 1}" aria-label="${exerciseLabel(i + 1)}"${i === currentIndex ? ' aria-current="true"' : ''}>${i + 1}</a>`
+    ).join('');
+}
+
+function renderExercises() {
+    const container = $('exercises');
     container.innerHTML = '';
     plan.exercises.forEach((ex, index) => {
         container.appendChild(index === editingIndex ? renderEditCard(index) : renderViewCard(ex, index));
     });
-
-    document.getElementById('undoBtn').disabled = historyStack.length === 0;
-    document.getElementById('redoBtn').disabled = redoStack.length === 0;
+    observeExercises();
 }
 
-function cardShell(index, buttons, bodyHtml) {
-    const col = document.createElement('div');
-    col.className = 'col-md-6 col-xl-4';
-    col.innerHTML = `
-        <div class="card exercise-card h-100">
-            <div class="card-header gradient-bg">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                    <h6 class="mb-0 small" style="font-size: 0.9rem;">
-                        <i class="bi bi-trophy"></i> Übung ${index + 1}
-                    </h6>
-                    <div class="d-flex gap-1">${buttons}</div>
-                </div>
-            </div>
-            <div class="card-body">${bodyHtml}</div>
-        </div>`;
-    return col;
-}
-
-function hintsHtml(index, ex) {
-    const hints = hintsFor(index, ex);
-    if (hints.length === 0) return '';
-    return `<div class="alert alert-danger py-2 mt-2 mb-0"><small><i class="bi bi-exclamation-circle"></i> `
-        + hints.map(escapeHtml).join('<br>') + '</small></div>';
+function names(players) {
+    return `<span class="who">${players.map(p => escapeHtml(p.name)).join(', ')}</span>`;
 }
 
 function renderViewCard(ex, index) {
+    const section = document.createElement('section');
+    section.className = 'exercise';
+    section.id = `ex-${index + 1}`;
+    section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
+
     let body = '';
     if (ex.pairs.length > 0) {
-        body += '<div class="row g-2">' + ex.pairs.map(p => `
-            <div class="col-md-6">
-                <div class="alert alert-info mb-0 d-flex align-items-center">
-                    <i class="bi bi-person-fill me-2"></i>
-                    <span><strong>${escapeHtml(p.player1.name)}</strong> & <strong>${escapeHtml(p.player2.name)}</strong></span>
-                </div>
-            </div>`).join('') + '</div>';
+        body += `<h3 class="group-label">Paare</h3><ul class="rows">`
+            + ex.pairs.map(p => `<li class="row"><span class="who">${escapeHtml(p.player1.name)}</span>`
+                + `<span class="amp">&amp;</span><span class="who">${escapeHtml(p.player2.name)}</span></li>`).join('')
+            + '</ul>';
     }
-    ex.balleimer.forEach((bucket, b) => {
-        body += `<div class="alert alert-success mb-0 mt-2"><i class="bi bi-basket me-2"></i>
-            <strong>Balleimer ${b + 1}:</strong> ${bucket.map(p => escapeHtml(p.name)).join(', ')}</div>`;
-    });
-    ex.sparring.forEach(s => {
-        body += `<div class="alert alert-primary mb-0 mt-2"><i class="bi bi-person-badge me-2"></i>
-            <strong>${escapeHtml(s.partner)}:</strong> ${escapeHtml(s.player.name)}</div>`;
-    });
-    if (ex.unpaired.length > 0) {
-        body += `<div class="alert alert-warning mb-0 mt-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>
-            <strong>Ohne Partner:</strong> ${ex.unpaired.map(p => escapeHtml(p.name)).join(', ')}</div>`;
+    const stations = [];
+    ex.balleimer.forEach((bucket, b) => stations.push(`<li class="row row-bucket">
+        <span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span> ${names(bucket)}</li>`));
+    ex.sparring.forEach(sp => stations.push(`<li class="row row-sparring">
+        <span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
+        <span class="who">${escapeHtml(sp.player.name)}</span></li>`));
+    if (ex.unpaired.length > 0) stations.push(`<li class="row row-pause">
+        <span class="tag">Ohne Partner</span> ${names(ex.unpaired)}</li>`);
+    if (stations.length > 0) {
+        body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
     }
     body += hintsHtml(index, ex);
 
-    const buttons = `<button class="btn btn-outline-light btn-sm py-0 px-2" title="Bearbeiten"
-        onclick="startEdit(${index})"><i class="bi bi-pencil"></i></button>`;
-    return cardShell(index, buttons, body);
+    section.innerHTML = `
+        <div class="exercise-head">
+            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)}</h2>
+            <button type="button" class="btn btn-quiet" aria-label="${exerciseLabel(index + 1)} bearbeiten">
+                <i class="bi bi-pencil" aria-hidden="true"></i> Bearbeiten</button>
+        </div>${body}`;
+    section.querySelector('.exercise-head button').addEventListener('click', () => startEdit(index));
+    return section;
 }
 
 function renderEditCard(index) {
     const players = [...plan.players].sort((a, b) => a.name.localeCompare(b.name));
     let slot = 0;
-    const select = (current) => {
+    const select = (current, label) => {
         const i = slot++;
         const options = players.map(p =>
             `<option value="${escapeHtml(p.name)}"${p.name === current.name ? ' selected' : ''}>`
             + `${escapeHtml(p.name)} (${p.klassierung})</option>`).join('');
-        return `<select class="form-select form-select-sm player-select" data-slot="${i}">${options}</select>`;
+        return `<select class="control" data-slot="${i}" aria-label="${escapeHtml(label)}">${options}</select>`;
     };
 
     let body = '';
-    if (draft.pairs.length > 0) {
-        body += '<div class="slot-label text-muted"><i class="bi bi-people"></i> Paare</div><div class="row g-2">'
-            + draft.pairs.map(p => `
-                <div class="col-12">
-                    <div class="input-group input-group-sm">
-                        ${select(p.player1)}<span class="input-group-text">&</span>${select(p.player2)}
-                    </div>
-                </div>`).join('') + '</div>';
-    }
-    draft.balleimer.forEach((bucket, b) => {
-        body += `<div class="slot-label text-success mt-3"><i class="bi bi-basket"></i> Balleimer ${b + 1}</div>
-            <div class="d-flex flex-column gap-1">${bucket.map(p => select(p)).join('')}</div>`;
+    draft.pairs.forEach((p, n) => {
+        body += `<div class="slot-group"><span class="tag">Paar ${n + 1}</span>
+            ${select(p.player1, `Paar ${n + 1}, erstes Kind`)}${select(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
     });
-    draft.sparring.forEach(s => {
-        body += `<div class="slot-label text-primary mt-3"><i class="bi bi-person-badge"></i> ${escapeHtml(s.partner)}</div>
-            ${select(s.player)}`;
+    draft.balleimer.forEach((bucket, b) => {
+        body += `<div class="slot-group row-bucket"><span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span>
+            ${bucket.map((p, k) => select(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;
+    });
+    draft.sparring.forEach(sp => {
+        body += `<div class="slot-group row-sparring"><span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
+            ${select(sp.player, `Sparring mit ${sp.partner}`)}</div>`;
     });
     if (draft.unpaired.length > 0) {
-        body += `<div class="slot-label text-warning mt-3"><i class="bi bi-exclamation-triangle-fill"></i> Ohne Partner</div>
-            <div class="d-flex flex-column gap-1">${draft.unpaired.map(p => select(p)).join('')}</div>`;
+        body += `<div class="slot-group"><span class="tag">Ohne Partner</span>
+            ${draft.unpaired.map((p, k) => select(p, `Ohne Partner, Kind ${k + 1}`)).join('')}</div>`;
     }
     body += hintsHtml(index, draft);
 
-    const isLast = index === plan.exercises.length - 1;
-    const buttons = `
-        <button class="btn btn-light btn-sm py-0 px-2" onclick="saveEdit()" title="Speichern">
-            <i class="bi bi-check-lg"></i> Speichern</button>
-        <button class="btn btn-outline-light btn-sm py-0 px-2" onclick="cancelEdit()" title="Abbrechen">
-            <i class="bi bi-x-lg"></i></button>
-        ${isLast ? '' : `<button class="btn btn-warning btn-sm py-0 px-2" id="regenerateBtn"
-            onclick="regenerateRemaining(${index})" title="Speichern und alle folgenden Übungen neu einteilen">
-            <i class="bi bi-arrow-clockwise"></i> Folgende neu</button>`}`;
-
-    const card = cardShell(index, buttons, body);
-    card.querySelectorAll('.player-select').forEach(el =>
+    const section = document.createElement('section');
+    section.className = 'exercise is-editing';
+    section.id = `ex-${index + 1}`;
+    section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
+    section.innerHTML = `
+        <div class="exercise-head">
+            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} <span class="visually-hidden">bearbeiten</span></h2>
+        </div>${body}`;
+    section.querySelectorAll('select[data-slot]').forEach(el =>
         el.addEventListener('change', () => changeSlot(parseInt(el.dataset.slot, 10), el.value)));
-    return card;
+    return section;
+}
+
+function renderBar() {
+    const editing = editingIndex !== null;
+    $('viewBar').hidden = editing;
+    $('editBar').hidden = !editing;
+    $('undoBtn').disabled = historyStack.length === 0 || busy;
+    $('redoBtn').disabled = redoStack.length === 0 || busy;
+    if (editing) {
+        const n = editingIndex + 1;
+        const total = plan.exercises.length;
+        $('editHint').textContent = `${exerciseLabel(n)}: Kind auswählen – wer den Platz hatte, wird getauscht.`;
+        const regen = $('regenerateBtn');
+        regen.hidden = n === total;
+        regen.querySelector('span').textContent = n + 1 === total
+            ? `Speichern und Übung ${total} neu einteilen`
+            : `Speichern und Übungen ${n + 1}–${total} neu einteilen`;
+        regen.disabled = busy;
+    }
+}
+
+// Highlight the exercise nearest the top in the number row
+let exerciseObserver = null;
+function observeExercises() {
+    if (exerciseObserver) exerciseObserver.disconnect();
+    const visible = new Map();
+    exerciseObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const index = parseInt(entry.target.id.replace('ex-', ''), 10) - 1;
+            if (entry.isIntersecting) visible.set(index, entry.boundingClientRect.top);
+            else visible.delete(index);
+        });
+        if (visible.size === 0) return;
+        const top = [...visible.entries()].sort((a, b) => a[0] - b[0])[0][0];
+        if (top !== currentIndex) {
+            currentIndex = top;
+            document.querySelectorAll('#exnavInner a').forEach((a, i) => {
+                if (i === currentIndex) {
+                    a.setAttribute('aria-current', 'true');
+                    a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    a.removeAttribute('aria-current');
+                }
+            });
+        }
+    }, { rootMargin: '-80px 0px -45% 0px' });
+    document.querySelectorAll('.exercise').forEach(el => exerciseObserver.observe(el));
 }
 
 // ===== EDITING =====
-function pushHistory() {
-    historyStack.push(clone(plan.exercises));
-    redoStack = [];
-}
-
 function startEdit(index) {
     if (editingIndex !== null) saveEdit();
     editingIndex = index;
     draft = clone(plan.exercises[index]);
-    render();
+    renderExercises();
+    renderBar();
+    const card = $(`ex-${index + 1}`);
+    card.scrollIntoView({ block: 'start' });
+    const first = card.querySelector('select');
+    if (first) first.focus({ preventScroll: true });
 }
 
-function saveEdit() {
+function saveEdit({ quiet = false } = {}) {
     if (editingIndex === null) return;
-    if (JSON.stringify(draft) !== JSON.stringify(plan.exercises[editingIndex])) {
+    const index = editingIndex;
+    const changed = JSON.stringify(draft) !== JSON.stringify(plan.exercises[index]);
+    if (changed) {
         pushHistory();
-        plan.exercises[editingIndex] = draft;
+        plan.exercises[index] = draft;
+        savePlan();
     }
     editingIndex = null;
     draft = null;
-    render();
+    renderExercises();
+    renderBar();
+    if (!quiet) toast(changed ? `${exerciseLabel(index + 1)} gespeichert` : 'Keine Änderung');
 }
 
 function cancelEdit() {
+    if (editingIndex === null) return;
     editingIndex = null;
     draft = null;
-    render();
+    renderExercises();
+    renderBar();
 }
 
-function regenerateRemaining(index) {
-    if (regenerating) return;
-    regenerating = true;
-    saveEdit();
-
-    fetch('/api/regenerate-exercises', {
+// ===== SERVER: RE-PLAN =====
+// Keeps exercises 1..keepThrough+1 and lets the server plan the rest
+function replan(nextPlan, keepThrough) {
+    busy = true;
+    renderBar();
+    return fetch('/api/regenerate-exercises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, keepThrough: index })
+        body: JSON.stringify({ plan: nextPlan, keepThrough })
     })
-        .then(async response => {
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || response.statusText);
-            return data;
-        })
+        .then(readJsonResponse)
         .then(data => {
             pushHistory();
+            plan.players = nextPlan.players;
+            plan.absent = nextPlan.absent;
             plan.exercises = data.exercises;
+            savePlan();
             render();
+            return data;
         })
-        .catch(error => {
-            console.error('Error regenerating exercises:', error);
-            alert('Neu einteilen fehlgeschlagen: ' + error.message);
-        })
-        .finally(() => { regenerating = false; });
+        .finally(() => {
+            busy = false;
+            renderBar();
+        });
 }
 
-// ===== UNDO / REDO =====
-function undo() {
-    if (historyStack.length === 0) return;
-    cancelEdit();
-    redoStack.push(clone(plan.exercises));
-    plan.exercises = historyStack.pop();
-    render();
+function regenerateFollowing() {
+    if (busy || editingIndex === null) return;
+    const index = editingIndex;
+    saveEdit({ quiet: true });
+    replan(clone(plan), index)
+        .then(() => toast(`Übungen ab ${index + 2} neu eingeteilt`, { label: 'Rückgängig', run: undo }))
+        .catch(error => toast('Neu einteilen ging nicht: ' + error.message));
 }
 
-function redo() {
-    if (redoStack.length === 0) return;
-    cancelEdit();
-    historyStack.push(clone(plan.exercises));
-    plan.exercises = redoStack.pop();
-    render();
+// ===== ATTENDANCE =====
+function allKids() {
+    const kids = [...plan.players, ...(plan.absent || [])];
+    if (attendance) kids.push(...attendance.added);
+    return kids.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function openAttendance() {
+    attendance = { present: new Set(plan.players.map(p => p.name)), added: [] };
+    $('applyFrom').innerHTML = plan.exercises.map((_, i) =>
+        `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
+    $('applyFrom').value = String(currentIndex + 1);
+    renderAttendance();
+}
+
+function attendanceChanged() {
+    if (!attendance) return false;
+    const before = new Set(plan.players.map(p => p.name));
+    if (attendance.added.length > 0) return true;
+    if (before.size !== attendance.present.size) return true;
+    return [...before].some(name => !attendance.present.has(name));
+}
+
+function renderAttendance() {
+    const open = attendance !== null;
+    $('attendanceBody').hidden = !open;
+    $('toggleAttendance').setAttribute('aria-expanded', String(open));
+    $('toggleAttendance').textContent = open ? 'Schliessen' : 'Anpassen';
+    $('presentCount').textContent = open ? attendance.present.size : plan.players.length;
+    if (!open) return;
+
+    const chips = $('attendanceChips');
+    chips.innerHTML = '';
+    allKids().forEach(kid => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'toggle-chip';
+        const here = attendance.present.has(kid.name);
+        button.setAttribute('aria-pressed', String(here));
+        button.textContent = kid.name;
+        button.addEventListener('click', () => {
+            if (attendance.present.has(kid.name)) attendance.present.delete(kid.name);
+            else attendance.present.add(kid.name);
+            renderAttendance();
+        });
+        chips.appendChild(button);
+    });
+
+    const changed = attendanceChanged();
+    $('applyAttendance').disabled = !changed || busy;
+    const from = parseInt($('applyFrom').value || '1', 10);
+    $('applyHint').textContent = from === 1
+        ? 'Der ganze Plan wird neu eingeteilt.'
+        : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt, wie sie ist.`;
+}
+
+function addLateKid() {
+    const name = $('lateName').value.trim();
+    const klassierung = parseInt($('lateKlassierung').value, 10);
+    if (!name) return;
+    if (isNaN(klassierung) || klassierung < 1 || klassierung > 21) {
+        toast('Die Klassierung liegt zwischen 1 und 21.');
+        return;
+    }
+    if (plan.settings.sparringPartners.includes(name)) {
+        toast(`${name} ist als Sparringpartner eingetragen.`);
+        return;
+    }
+    const known = allKids().find(k => k.name === name);
+    if (known) {
+        attendance.present.add(name);
+        toast(`${name} ist wieder dabei`);
+    } else {
+        attendance.added.push({ name, klassierung });
+        attendance.present.add(name);
+    }
+    $('lateName').value = '';
+    renderAttendance();
+}
+
+function applyAttendance() {
+    if (busy || !attendanceChanged()) return;
+    if (editingIndex !== null) saveEdit({ quiet: true });
+    const from = parseInt($('applyFrom').value, 10);
+    const kids = allKids();
+    const next = clone(plan);
+    next.players = kids.filter(k => attendance.present.has(k.name));
+    next.absent = kids.filter(k => !attendance.present.has(k.name));
+
+    replan(next, from - 2)
+        .then(() => {
+            attendance = null;
+            renderAttendance();
+            toast(`Plan ab ${exerciseLabel(from)} angepasst`, { label: 'Rückgängig', run: undo });
+            const target = $(`ex-${from}`);
+            if (target) target.scrollIntoView({ block: 'start' });
+        })
+        .catch(error => toast('Anpassen ging nicht: ' + error.message));
 }
 
 // ===== PDF =====
 function exportPdf() {
-    saveEdit();
+    if (editingIndex !== null) saveEdit({ quiet: true });
+    const button = $('pdfBtn');
+    button.disabled = true;
     fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -311,20 +513,48 @@ function exportPdf() {
             a.click();
             window.URL.revokeObjectURL(url);
             a.remove();
+            toast('PDF heruntergeladen');
         })
-        .catch(error => {
-            console.error('Export error:', error);
-            alert('PDF Export fehlgeschlagen');
-        });
+        .catch(() => toast('Das PDF konnte nicht erstellt werden. Bitte nochmals versuchen.'))
+        .finally(() => { button.disabled = false; });
 }
 
+// ===== WIRING =====
 document.addEventListener('DOMContentLoaded', () => {
     render();
+    if (!plan) return;
+
+    $('undoBtn').addEventListener('click', undo);
+    $('redoBtn').addEventListener('click', redo);
+    $('pdfBtn').addEventListener('click', exportPdf);
+    $('saveEdit').addEventListener('click', () => saveEdit());
+    $('cancelEdit').addEventListener('click', cancelEdit);
+    $('regenerateBtn').addEventListener('click', regenerateFollowing);
+
+    $('toggleAttendance').addEventListener('click', () => {
+        if (attendance) {
+            attendance = null;
+            renderAttendance();
+        } else {
+            openAttendance();
+        }
+    });
+    $('applyFrom').addEventListener('change', renderAttendance);
+    $('applyAttendance').addEventListener('click', applyAttendance);
+    $('addLateBtn').addEventListener('click', addLateKid);
+    $('lateName').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addLateKid();
+        }
+    });
 
     document.addEventListener('keydown', (e) => {
         // Leave Ctrl+Z inside form fields to the browser
         if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        if (e.key === 'Escape' && editingIndex !== null) {
+            cancelEdit();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             undo();
         } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
