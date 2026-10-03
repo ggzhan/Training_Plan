@@ -2,6 +2,9 @@
 
 let currentPlayers = [];
 let sparringPartners = [];
+let balleimerSizes = []; // kids per Balleimer, one entry per Balleimer
+const MAX_BALLEIMER = 6;
+const MAX_PER_BALLEIMER = 8;
 let editingPlayerIndex = null;
 let rosterEdited = false;
 let sortColumn = 'name';
@@ -165,16 +168,19 @@ function loadSettings() {
     const saved = readStored(STORAGE_KEYS.settings);
     if (!saved) return;
     if (saved.numberOfExercises) $('numberOfExercises').value = saved.numberOfExercises;
-    if (saved.balleimerCount != null) $('balleimerCount').value = saved.balleimerCount;
-    if (saved.playersPerBalleimer) $('playersPerBalleimer').value = saved.playersPerBalleimer;
+    if (Array.isArray(saved.balleimerSizes)) {
+        balleimerSizes = saved.balleimerSizes;
+    } else if (saved.balleimerCount > 0) {
+        // Saved before each Balleimer had its own size
+        balleimerSizes = Array(saved.balleimerCount).fill(saved.playersPerBalleimer || 2);
+    }
     if (Array.isArray(saved.sparringPartners)) sparringPartners = saved.sparringPartners;
 }
 
 function currentSettings() {
     return {
         numberOfExercises: intValue('numberOfExercises'),
-        balleimerCount: intValue('balleimerCount'),
-        playersPerBalleimer: intValue('playersPerBalleimer'),
+        balleimerSizes,
         sparringPartners
     };
 }
@@ -190,6 +196,67 @@ function step(id, delta) {
     const max = parseInt(input.max, 10);
     input.value = Math.min(max, Math.max(min, intValue(id) + delta));
     settingsChanged();
+}
+
+// ===== BALLEIMER =====
+function renderBalleimer() {
+    const list = $('bucketList');
+    list.innerHTML = '';
+    if (balleimerSizes.length === 0) {
+        list.innerHTML = '<li class="empty">Keine Balleimer – alle Kinder spielen in Paaren oder Sparring.</li>';
+    }
+    balleimerSizes.forEach((size, index) => {
+        const n = index + 1;
+        const item = document.createElement('li');
+        item.innerHTML = `
+            <label for="bucket-${n}">Balleimer ${n}</label>
+            <div class="stepper">
+                <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind weniger"${size <= 1 ? ' disabled' : ''}>−</button>
+                <input type="number" id="bucket-${n}" inputmode="numeric" min="1" max="${MAX_PER_BALLEIMER}" value="${size}"
+                    aria-describedby="bucket-${n}-unit">
+                <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind mehr"${size >= MAX_PER_BALLEIMER ? ' disabled' : ''}>+</button>
+            </div>
+            <span id="bucket-${n}-unit" class="visually-hidden">Kinder</span>
+            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="Balleimer ${n} entfernen">
+                <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
+        const [minus, plus, remove] = item.querySelectorAll('button');
+        minus.addEventListener('click', () => setBucketSize(index, size - 1));
+        plus.addEventListener('click', () => setBucketSize(index, size + 1));
+        remove.addEventListener('click', () => removeBucket(index));
+        item.querySelector('input').addEventListener('change', (e) => setBucketSize(index, parseInt(e.target.value, 10)));
+        list.appendChild(item);
+    });
+    $('addBucketBtn').disabled = balleimerSizes.length >= MAX_BALLEIMER;
+}
+
+function setBucketSize(index, size) {
+    balleimerSizes[index] = Math.min(MAX_PER_BALLEIMER, Math.max(1, isNaN(size) ? 1 : size));
+    renderBalleimer();
+    settingsChanged();
+    const input = $(`bucket-${index + 1}`);
+    if (input) input.focus();
+}
+
+function addBucket() {
+    if (balleimerSizes.length >= MAX_BALLEIMER) return;
+    // A new Balleimer starts like the last one, or with 2 kids
+    balleimerSizes.push(balleimerSizes.length > 0 ? balleimerSizes[balleimerSizes.length - 1] : 2);
+    renderBalleimer();
+    settingsChanged();
+}
+
+function removeBucket(index) {
+    const [size] = balleimerSizes.splice(index, 1);
+    renderBalleimer();
+    settingsChanged();
+    toast(`Balleimer ${index + 1} entfernt`, {
+        label: 'Rückgängig',
+        run: () => {
+            balleimerSizes.splice(index, 0, size);
+            renderBalleimer();
+            settingsChanged();
+        }
+    });
 }
 
 // ===== SPARRING PARTNERS =====
@@ -234,8 +301,8 @@ function checkStations() {
     const summary = $('stationSummary');
     const fix = $('fixSuggestion');
     const kids = currentPlayers.length;
-    const { numberOfExercises: exercises, balleimerCount: buckets, playersPerBalleimer: perBucket } = currentSettings();
-    const atBuckets = buckets * perBucket;
+    const exercises = intValue('numberOfExercises');
+    const atBuckets = balleimerSizes.reduce((sum, size) => sum + size, 0);
     const sparring = sparringPartners.length;
     const playing = kids - atBuckets - sparring;
     const kidNames = new Set(currentPlayers.map(p => p.name));
@@ -251,7 +318,7 @@ function checkStations() {
         error = `Balleimer und Sparring brauchen ${atBuckets + sparring} Kinder pro Übung, es sind aber nur ${kids} da.`;
     } else if (exercises * atBuckets > kids) {
         const maxExercises = Math.floor(kids / atBuckets);
-        error = `Jedes Kind darf nur einmal an einen Balleimer. Mit ${buckets} × ${perBucket} Kindern `
+        error = `Jedes Kind darf nur einmal an einen Balleimer. Mit ${atBuckets} Balleimer-Plätzen pro Übung `
             + `reicht es für höchstens ${maxExercises} ${maxExercises === 1 ? 'Übung' : 'Übungen'}.`;
         fixAction = {
             label: `Auf ${maxExercises} ${maxExercises === 1 ? 'Übung' : 'Übungen'} setzen`,
@@ -320,6 +387,7 @@ function generatePlan(event) {
 // ===== WIRING =====
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
+    renderBalleimer();
     renderSparringPartners();
 
     const lastPlan = readStored(STORAGE_KEYS.plan);
@@ -331,8 +399,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-step]').forEach(btn =>
         btn.addEventListener('click', () => step(btn.dataset.for, parseInt(btn.dataset.step, 10))));
-    ['numberOfExercises', 'balleimerCount', 'playersPerBalleimer'].forEach(id =>
-        $(id).addEventListener('input', settingsChanged));
+    $('numberOfExercises').addEventListener('input', settingsChanged);
+    $('addBucketBtn').addEventListener('click', addBucket);
 
     $('addSparringBtn').addEventListener('click', addSparringPartner);
     // Enter in the name field adds the partner instead of submitting the form

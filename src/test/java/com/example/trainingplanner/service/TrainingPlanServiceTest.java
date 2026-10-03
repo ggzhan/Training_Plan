@@ -30,7 +30,8 @@ class TrainingPlanServiceTest {
     }
 
     private static PlanSettings settings(int exercises, int balleimer, int perBalleimer, String... partners) {
-        return new PlanSettings(exercises, balleimer, perBalleimer, new ArrayList<>(List.of(partners)));
+        return new PlanSettings(exercises, new ArrayList<>(java.util.Collections.nCopies(balleimer, perBalleimer)),
+                new ArrayList<>(List.of(partners)));
     }
 
     private static TrainingPlan generate(long seed, List<Player> players, PlanSettings settings) {
@@ -207,5 +208,35 @@ class TrainingPlanServiceTest {
             assertEquals(12, names.size());
         }
         assertTrue(namesIn(adjusted.getExercises().get(0)).contains("Kind 0"));
+    }
+
+    @Test
+    void eachBalleimerGetsItsOwnNumberOfKids() {
+        List<Player> players = kids(15);
+        PlanSettings uneven = new PlanSettings(3, new ArrayList<>(List.of(3, 1)), new ArrayList<>());
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, players, uneven);
+            Set<String> seen = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                assertEquals(List.of(3, 1), round.getBalleimer().stream().map(List::size).toList());
+                round.getBalleimer().forEach(b -> b.forEach(p -> assertTrue(seen.add(p.getName()))));
+                assertEquals(15, new HashSet<>(namesIn(round)).size());
+            }
+        }
+    }
+
+    @Test
+    void oldSavedPlansWithOneSizeForAllBalleimerStillWork() {
+        PlanSettings legacy = new PlanSettings();
+        legacy.setNumberOfExercises(2);
+        legacy.setBalleimerCount(2);
+        legacy.setPlayersPerBalleimer(3);
+        legacy.setSparringPartners(new ArrayList<>());
+
+        TrainingPlan plan = generate(1, kids(14), legacy);
+
+        assertEquals(List.of(3, 3), plan.getSettings().getBalleimerSizes());
+        plan.getExercises().forEach(round ->
+                assertEquals(List.of(3, 3), round.getBalleimer().stream().map(List::size).toList()));
     }
 }

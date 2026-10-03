@@ -1,22 +1,25 @@
 package com.example.trainingplanner.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class PlanSettings {
     private int numberOfExercises = 6;
-    private int balleimerCount;
-    private int playersPerBalleimer = 2;
+    // Kids per Balleimer, one entry per Balleimer, e.g. [3, 2]
+    private List<Integer> balleimerSizes = new ArrayList<>();
     private List<String> sparringPartners = new ArrayList<>();
+
+    // Plans saved before per-Balleimer sizes had one count and one size for all
+    private int legacyBalleimerCount;
+    private int legacyPlayersPerBalleimer;
 
     public PlanSettings() {
     }
 
-    public PlanSettings(int numberOfExercises, int balleimerCount, int playersPerBalleimer,
-            List<String> sparringPartners) {
+    public PlanSettings(int numberOfExercises, List<Integer> balleimerSizes, List<String> sparringPartners) {
         this.numberOfExercises = numberOfExercises;
-        this.balleimerCount = balleimerCount;
-        this.playersPerBalleimer = playersPerBalleimer;
+        this.balleimerSizes = balleimerSizes;
         this.sparringPartners = sparringPartners;
     }
 
@@ -28,20 +31,24 @@ public class PlanSettings {
         this.numberOfExercises = numberOfExercises;
     }
 
-    public int getBalleimerCount() {
-        return balleimerCount;
+    public List<Integer> getBalleimerSizes() {
+        if ((balleimerSizes == null || balleimerSizes.isEmpty()) && legacyBalleimerCount > 0) {
+            return new ArrayList<>(Collections.nCopies(legacyBalleimerCount, Math.max(1, legacyPlayersPerBalleimer)));
+        }
+        return balleimerSizes;
     }
 
+    public void setBalleimerSizes(List<Integer> balleimerSizes) {
+        this.balleimerSizes = balleimerSizes;
+    }
+
+    // Write-only: read from old saved plans, never written back
     public void setBalleimerCount(int balleimerCount) {
-        this.balleimerCount = balleimerCount;
-    }
-
-    public int getPlayersPerBalleimer() {
-        return playersPerBalleimer;
+        this.legacyBalleimerCount = balleimerCount;
     }
 
     public void setPlayersPerBalleimer(int playersPerBalleimer) {
-        this.playersPerBalleimer = playersPerBalleimer;
+        this.legacyPlayersPerBalleimer = playersPerBalleimer;
     }
 
     public List<String> getSparringPartners() {
@@ -53,6 +60,10 @@ public class PlanSettings {
     }
 
     public int balleimerSlots() {
-        return balleimerCount * playersPerBalleimer;
+        int total = 0;
+        for (int size : getBalleimerSizes()) {
+            total += size;
+        }
+        return total;
     }
 }

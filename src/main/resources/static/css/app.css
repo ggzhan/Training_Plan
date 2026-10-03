@@ -365,6 +365,35 @@ select.control {
     margin: 0;
 }
 
+/* One row per Balleimer: name, kids stepper, remove */
+.bucket-list {
+    list-style: none;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+}
+
+.bucket-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 56px;
+    border-bottom: 1px solid var(--line);
+}
+
+.bucket-list li label {
+    flex: 1;
+    font-weight: 600;
+}
+
+.bucket-list .empty {
+    color: var(--ink-2);
+    font-size: 0.9375rem;
+}
+
+h3.field-label {
+    font-size: 1rem;
+}
+
 /* ===== Chips ===== */
 .chips {
     display: flex;

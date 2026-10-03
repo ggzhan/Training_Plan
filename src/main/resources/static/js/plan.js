@@ -157,7 +157,9 @@ function render() {
     document.title = plan.trainingDate ? `Trainingsplan ${plan.trainingDate}` : 'Trainingsplan';
     const s = plan.settings;
     const meta = [`${plan.players.length} Kinder`];
-    if (s.balleimerCount > 0) meta.push(`${s.balleimerCount} Balleimer à ${s.playersPerBalleimer}`);
+    const sizes = s.balleimerSizes || Array(s.balleimerCount || 0).fill(s.playersPerBalleimer);
+    if (sizes.length === 1) meta.push(`1 Balleimer (${sizes[0]})`);
+    else if (sizes.length > 1) meta.push(`${sizes.length} Balleimer (${sizes.join(' + ')})`);
     if (s.sparringPartners.length > 0) meta.push(`Sparring: ${s.sparringPartners.join(', ')}`);
     $('planMeta').textContent = meta.join(' · ');
 

@@ -56,10 +56,10 @@ public class TrainingPlanService {
 
         int balleimerPlaces = clean.getNumberOfExercises() * clean.balleimerSlots();
         if (balleimerPlaces > players.size()) {
-            throw new IllegalArgumentException(clean.getNumberOfExercises() + " Übungen × "
-                    + clean.getBalleimerCount() + " Balleimer × " + clean.getPlayersPerBalleimer()
-                    + " Kinder = " + balleimerPlaces + " Balleimer-Plätze, aber nur " + players.size()
-                    + " Kinder – jedes Kind darf nur einmal an einen Balleimer.");
+            int maxExercises = players.size() / clean.balleimerSlots();
+            throw new IllegalArgumentException("Jedes Kind darf nur einmal an einen Balleimer. Mit "
+                    + clean.balleimerSlots() + " Balleimer-Plätzen pro Übung reicht es bei " + players.size()
+                    + " Kindern für höchstens " + maxExercises + (maxExercises == 1 ? " Übung." : " Übungen."));
         }
 
         return build(players, clean, trainingDate, List.of());
@@ -116,9 +116,10 @@ public class TrainingPlanService {
             }
             // Similar levels share a Balleimer
             chosen.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
-            for (int b = 0; b < settings.getBalleimerCount(); b++) {
-                int from = b * settings.getPlayersPerBalleimer();
-                round.getBalleimer().add(new ArrayList<>(chosen.subList(from, from + settings.getPlayersPerBalleimer())));
+            int from = 0;
+            for (int size : settings.getBalleimerSizes()) {
+                round.getBalleimer().add(new ArrayList<>(chosen.subList(from, from + size)));
+                from += size;
             }
         }
 
@@ -275,7 +276,7 @@ public class TrainingPlanService {
         return total;
     }
 
-    /** Trims sparring names, drops blanks and duplicates, clamps the numbers. */
+    /** Trims sparring names, drops blanks and duplicates, drops empty Balleimer, clamps the numbers. */
     private PlanSettings normalize(PlanSettings settings) {
         PlanSettings s = settings == null ? new PlanSettings() : settings;
         Set<String> partners = new LinkedHashSet<>();
@@ -286,8 +287,15 @@ public class TrainingPlanService {
                 }
             }
         }
-        return new PlanSettings(Math.max(1, s.getNumberOfExercises()), Math.max(0, s.getBalleimerCount()),
-                Math.max(1, s.getPlayersPerBalleimer()), new ArrayList<>(partners));
+        List<Integer> sizes = new ArrayList<>();
+        if (s.getBalleimerSizes() != null) {
+            for (Integer size : s.getBalleimerSizes()) {
+                if (size != null && size > 0) {
+                    sizes.add(size);
+                }
+            }
+        }
+        return new PlanSettings(Math.max(1, s.getNumberOfExercises()), sizes, new ArrayList<>(partners));
     }
 
     private void validate(List<Player> players, PlanSettings settings) {
