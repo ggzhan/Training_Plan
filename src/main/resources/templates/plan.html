@@ -58,16 +58,6 @@
             border: 2px solid #667eea;
         }
 
-        .player-select.duplicate {
-            border-color: #dc3545;
-            background-color: #ffe6e6;
-        }
-
-        .player-select.unused {
-            border-color: #ffc107;
-            background-color: #fff9e6;
-        }
-
         /* Collapsible chevron animation */
         .collapse-icon {
             transition: transform 0.3s ease;
@@ -77,13 +67,10 @@
             transform: rotate(180deg);
         }
 
-        /* Reduce vertical space in edit mode */
-        .pair-view[style*="display: none"],
-        .unpaired-view[style*="display: none"] {
-            display: none !important;
-            height: 0;
-            margin: 0;
-            padding: 0;
+        .slot-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
         }
 
         /* Compact Card Styling */
@@ -131,260 +118,57 @@
         <div class="card mb-4">
             <div class="card-header gradient-bg">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h4 class="mb-0 fs-5"><i class="bi bi-clipboard-check"></i> Trainingsplan</h4>
+                    <h4 class="mb-0 fs-5"><i class="bi bi-clipboard-check"></i> Trainingsplan
+                        <span id="planDate" class="opacity-75"></span></h4>
                     <div>
                         <button id="undoBtn" class="btn btn-light btn-sm me-2" onclick="undo()" disabled
-                            title="Undo (Ctrl+Z)">
+                            title="Rückgängig (Ctrl+Z)">
                             <i class="bi bi-arrow-counterclockwise"></i>
                         </button>
                         <button id="redoBtn" class="btn btn-light btn-sm" onclick="redo()" disabled
-                            title="Redo (Ctrl+Y)">
+                            title="Wiederholen (Ctrl+Y)">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
                 </div>
                 <div class="row text-center g-2">
                     <div class="col-6">
-                        <h2 class="h5 mb-0"><i class="bi bi-people-fill"></i> <span
-                                th:text="${trainingPlan.playerCount}">0</span></h2>
+                        <h2 class="h5 mb-0"><i class="bi bi-people-fill"></i> <span id="playerCount">0</span></h2>
                         <small class="opacity-75">Spieler</small>
                     </div>
                     <div class="col-6">
-                        <h2 class="h5 mb-0"><i class="bi bi-list-check"></i> <span
-                                th:text="${trainingPlan.exercises.size()}">0</span></h2>
+                        <h2 class="h5 mb-0"><i class="bi bi-list-check"></i> <span id="exerciseCount">0</span></h2>
                         <small class="opacity-75">Übungen</small>
+                    </div>
+                    <div class="col-12">
+                        <small id="settingsSummary" class="opacity-75"></small>
                     </div>
                 </div>
             </div>
 
             <div class="card-body bg-light">
-                <!-- Exercise List -->
-                <div class="row g-3">
-                    <div class="col-md-6 col-xl-4" th:each="exercise, exerciseStat : ${trainingPlan.exercises}">
-                        <div class="card exercise-card" th:attr="data-exercise-index=${exerciseStat.index}">
-                            <div class="card-header gradient-bg">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0 flex-grow-1 small" data-bs-toggle="collapse"
-                                        th:attr="data-bs-target='#exercise' + ${exerciseStat.index}"
-                                        style="cursor: pointer; font-size: 0.9rem;">
-                                        <i class="bi bi-chevron-down collapse-icon me-1"></i>
-                                        <i class="bi bi-trophy"></i> Übung <span
-                                            th:text="${exerciseStat.count}">1</span>
-                                    </h6>
-                                    <div class="btn-group" role="group">
-                                        <button class="btn btn-outline-light btn-sm py-0 px-2"
-                                            th:attr="data-exercise-index=${exerciseStat.index}"
-                                            onclick="toggleEditMode(this)" title="Bearbeiten">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-warning btn-sm regenerate-btn" style="display: none;"
-                                            th:attr="data-exercise-index=${exerciseStat.index},data-is-last=${exerciseStat.last}"
-                                            onclick="regenerateRemaining(this)">
-                                            <i class="bi bi-arrow-clockwise"></i> Verbleibende Übungen neu generieren
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                <!-- Exercise cards are rendered by plan.js -->
+                <div class="row g-3" id="exercises"></div>
 
-                            <div class="collapse show" th:id="'exercise' + ${exerciseStat.index}">
-                                <div class="card-body">
-                                    <!-- Player Pairs -->
-                                    <div
-                                        th:if="${trainingPlan.exercisePairs.get(exercise) != null and !trainingPlan.exercisePairs.get(exercise).isEmpty()}">
-                                        <h6 class="text-muted mb-3"><i class="bi bi-people"></i> Zugewiesene Paare:</h6>
-                                        <div class="row g-2" th:attr="data-exercise-index=${exerciseStat.index}">
-                                            <div class="col-md-6"
-                                                th:each="pair, pairStat : ${trainingPlan.exercisePairs.get(exercise)}"
-                                                th:attr="data-pair-index=${pairStat.index}">
-                                                <!-- View Mode -->
-                                                <div class="pair-view alert alert-info mb-0 d-flex align-items-center">
-                                                    <i class="bi bi-person-fill me-2"></i>
-                                                    <span>
-                                                        <strong th:text="${pair.player1.name}">Spieler 1</strong> &
-                                                        <strong th:text="${pair.player2.name}">Spieler 2</strong>
-                                                    </span>
-                                                </div>
-                                                <!-- Edit Mode -->
-                                                <div class="pair-edit" style="display: none;">
-                                                    <div class="input-group input-group-sm">
-                                                        <select class="form-select player-select player1-select"
-                                                            th:attr="data-pair-index=${pairStat.index}">
-                                                            <option th:each="player : ${trainingPlan.availablePlayers}"
-                                                                th:value="${player.name}"
-                                                                th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
-                                                                th:selected="${player.name == pair.player1.name}">
-                                                            </option>
-                                                        </select>
-                                                        <span class="input-group-text">&</span>
-                                                        <select class="form-select player-select player2-select"
-                                                            th:attr="data-pair-index=${pairStat.index}">
-                                                            <option th:each="player : ${trainingPlan.availablePlayers}"
-                                                                th:value="${player.name}"
-                                                                th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
-                                                                th:selected="${player.name == pair.player2.name}">
-                                                            </option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Unpaired Players -->
-                                    <div th:if="${trainingPlan.unpairedPlayers != null and trainingPlan.unpairedPlayers.get(exercise) != null and !trainingPlan.unpairedPlayers.get(exercise).isEmpty()}"
-                                        class="mt-3">
-                                        <!-- View Mode -->
-                                        <div class="unpaired-view alert alert-warning mb-0"
-                                            th:attr="data-unpaired-names=${#strings.listJoin(trainingPlan.unpairedPlayers.get(exercise).![name], ',')}">
-                                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                            <strong>Ohne Partner:</strong>
-                                            <span
-                                                th:each="player, iterStat : ${trainingPlan.unpairedPlayers.get(exercise)}">
-                                                <span th:text="${player.name}">Spieler Name</span><span
-                                                    th:if="${!iterStat.last}">, </span>
-                                            </span>
-                                        </div>
-                                        <!-- Edit Mode -->
-                                        <div class="unpaired-edit" style="display: none;">
-                                            <label class="form-label text-warning fw-bold">
-                                                <i class="bi bi-exclamation-triangle-fill"></i> Spieler ohne Partner:
-                                            </label>
-                                            <div th:each="unpairedPlayer, iterStat : ${trainingPlan.unpairedPlayers.get(exercise)}"
-                                                class="mb-2">
-                                                <select class="form-select player-select unpaired-player-select"
-                                                    th:attr="data-unpaired-index=${iterStat.index}">
-                                                    <option th:each="player : ${trainingPlan.availablePlayers}"
-                                                        th:value="${player.name}"
-                                                        th:text="${player.name} + ' (' + ${player.klassierung} + ')'"
-                                                        th:selected="${player.name == unpairedPlayer.name}">
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Validation Warnings -->
-                                    <div class="validation-warnings mt-3"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Back Link and Export -->
-                    <div class="mt-4 text-center">
-                        <a href="/" class="btn btn-gradient btn-lg me-2">
-                            <i class="bi bi-arrow-left-circle"></i> Weiteren Plan erstellen
-                        </a>
-                        <button onclick="exportPdf()" class="btn btn-outline-primary btn-lg">
-                            <i class="bi bi-file-earmark-pdf"></i> PDF Export
-                        </button>
-                    </div>
+                <!-- Back Link and Export -->
+                <div class="mt-4 text-center">
+                    <a href="/" class="btn btn-gradient btn-lg me-2">
+                        <i class="bi bi-arrow-left-circle"></i> Weiteren Plan erstellen
+                    </a>
+                    <button id="pdfBtn" onclick="exportPdf()" class="btn btn-outline-primary btn-lg">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF Export
+                    </button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Bootstrap 5 JS -->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script th:src="@{/js/app.js(v=24)}"></script>
-        <script th:inline="javascript">
-            // PDF Export function
-            function exportPdf() {
-                // Get player count and exercise count from the page
-                const playerCount = /*[[${trainingPlan.playerCount}]]*/ 0;
-                const exerciseCount = /*[[${trainingPlan.exercises.size()}]]*/ 0;
-
-                const request = {
-                    playerCount: playerCount,
-                    exercises: [],
-                    exercisePairs: {},
-                    unpairedPlayers: {}
-                };
-
-                // Extract data from DOM for each exercise
-                document.querySelectorAll('.exercise-card').forEach((card, index) => {
-                    const exerciseKey = 'Exercise ' + (index + 1);
-                    request.exercises.push({ name: exerciseKey });
-
-                    // Get pairs from view mode (pair-view elements)
-                    const pairs = [];
-                    card.querySelectorAll('.pair-view').forEach(pairEl => {
-                        const strongEls = pairEl.querySelectorAll('strong');
-                        if (strongEls.length >= 2) {
-                            pairs.push({
-                                player1Name: strongEls[0].textContent.trim(),
-                                player1Klassierung: 0,
-                                player2Name: strongEls[1].textContent.trim(),
-                                player2Klassierung: 0
-                            });
-                        }
-                    });
-
-                    if (pairs.length > 0) {
-                        request.exercisePairs[exerciseKey] = pairs;
-                    }
-
-                    // Get unpaired players
-                    const unpairedView = card.querySelector('.unpaired-view');
-                    if (unpairedView) {
-                        let names = [];
-
-                        // Method 1: Try data attribute (most reliable)
-                        if (unpairedView.dataset.unpairedNames) {
-                            names = unpairedView.dataset.unpairedNames.split(',').map(n => n.trim()).filter(n => n);
-                        }
-                        // Method 2: Fallback to text parsing (for backward compatibility if needed)
-                        else {
-                            const text = unpairedView.textContent.replace(/\s+/g, ' ').trim();
-                            const match = text.match(/Ohne Partner:\s*(.+)/);
-                            if (match) {
-                                const namesSet = new Set(
-                                    match[1].split(',')
-                                        .map(n => n.trim().replace(/[,;:]+$/, '').trim())
-                                        .filter(n => n && n.length > 0)
-                                );
-                                names = [...namesSet];
-                            }
-                        }
-
-                        if (names.length > 0) {
-                            request.unpairedPlayers[exerciseKey] = names;
-                        }
-                    }
-                });
-
-                console.log('PDF Export request (FIXED v2):', request);
-
-                // Send request to backend
-                fetch('/api/export-pdf', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(request)
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('PDF export failed');
-                        }
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        // Download the PDF
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'trainingsplan.pdf';
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        a.remove();
-                    })
-                    .catch(error => {
-                        console.error('Export error:', error);
-                        alert('PDF Export fehlgeschlagen');
-                    });
-            }
-        </script>
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        const PLAN = JSON.parse(/*[[${planJson}]]*/ '{}');
+    </script>
+    <script th:src="@{/js/plan.js(v=1)}"></script>
 </body>
 
 </html>

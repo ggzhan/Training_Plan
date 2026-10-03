@@ -1,276 +1,189 @@
 package com.example.trainingplanner.service;
 
+import com.example.trainingplanner.model.ExerciseRound;
+import com.example.trainingplanner.model.PlanSettings;
 import com.example.trainingplanner.model.Player;
-import com.example.trainingplanner.model.TrainingSession;
-import org.junit.jupiter.api.BeforeEach;
+import com.example.trainingplanner.model.PlayerPair;
+import com.example.trainingplanner.model.SparringAssignment;
+import com.example.trainingplanner.model.TrainingPlan;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class TrainingPlanServiceTest {
 
-    private CsvServiceStub csvServiceStub;
-    private TrainingPlanService trainingPlanService;
+    private static final int[] LEVELS = { 1, 2, 2, 2, 3, 4, 5, 6, 7, 8, 10, 12 };
 
-    @BeforeEach
-    void setUp() {
-        csvServiceStub = new CsvServiceStub();
-        trainingPlanService = new TrainingPlanService(csvServiceStub);
-    }
-
-    @Test
-    void generatePlan_shouldCreateValidSession() throws Exception {
-        // Mock players
-        List<Player> players = Arrays.asList(
-                new Player("Player 1", 10),
-                new Player("Player 2", 9),
-                new Player("Player 3", 8),
-                new Player("Player 4", 7),
-                new Player("Player 5", 6));
-        csvServiceStub.setPlayers(players);
-
-        // Test
-        TrainingSession session = trainingPlanService.generatePlan(players, 6, 1);
-
-        // Verify
-        assertNotNull(session);
-        assertEquals(90, session.getTotalDuration());
-        // Number of exercises depends on stubbed exercises (3 * 15 = 45 < 90, so all 3
-        // should be selected)
-        assertTrue(session.getExercises().size() > 0);
-        assertEquals(5, session.getPlayerCount());
-        assertNotNull(session.getExercisePairs());
-        assertEquals(session.getExercises().size(), session.getExercisePairs().size());
-
-        System.out.println("Generated Plan: " + session.getNotes());
-        System.out.println("Number of Exercises: " + session.getExercises().size());
-        System.out.println("Player Count: " + session.getPlayerCount());
-    }
-
-    @Test
-    void generatePlan_withOddPlayers_shouldHaveUnpairedPlayers() throws Exception {
-        // Mock players (odd number)
-        List<Player> players = Arrays.asList(
-                new Player("Player 1", 10),
-                new Player("Player 2", 9),
-                new Player("Player 3", 8));
-        csvServiceStub.setPlayers(players);
-
-        // Test
-        TrainingSession session = trainingPlanService.generatePlan(players, 6, 1);
-
-        // Verify
-        assertNotNull(session);
-        assertTrue(session.getExercises().size() > 0);
-        assertEquals(3, session.getPlayerCount());
-        assertNotNull(session.getUnpairedPlayers());
-        assertEquals(session.getExercises().size(), session.getUnpairedPlayers().size()); // Each exercise should have
-                                                                                          // an unpaired player
-    }
-
-    @Test
-    void generatePlan_withMultipleUnpairedPlayers() throws Exception {
-        // Mock players (5 players)
-        List<Player> players = Arrays.asList(
-                new Player("Player 1", 10),
-                new Player("Player 2", 9),
-                new Player("Player 3", 8),
-                new Player("Player 4", 7),
-                new Player("Player 5", 6));
-        csvServiceStub.setPlayers(players);
-
-        // Test with 3 unpaired players (so only 1 pair per exercise)
-        TrainingSession session = trainingPlanService.generatePlan(players, 6, 3);
-
-        // Verify
-        assertNotNull(session);
-        assertTrue(session.getExercises().size() > 0);
-        assertNotNull(session.getUnpairedPlayers());
-
-        // Check first exercise
-        com.example.trainingplanner.model.Exercise firstEx = session.getExercises().get(0);
-        List<Player> unpaired = session.getUnpairedPlayers().get(firstEx);
-        assertNotNull(unpaired);
-        assertEquals(3, unpaired.size());
-    }
-
-    @Test
-    void regenerateRemainingExercises_shouldRotateUnpairedPlayers() {
-        // Setup 5 players
-        List<Player> players = Arrays.asList(
-                new Player("A", 10), new Player("B", 10),
-                new Player("C", 10), new Player("D", 10),
-                new Player("E", 10));
-
-        // Create request with Ex 1 having A unpaired
-        com.example.trainingplanner.dto.RegenerateRequest request = new com.example.trainingplanner.dto.RegenerateRequest();
-        request.setExerciseIndex(0); // Edit after Ex 1
-        request.setAvailablePlayers(players);
-
-        Map<String, List<com.example.trainingplanner.dto.RegenerateRequest.PairDto>> currentPairings = new java.util.HashMap<>();
-        // Ex 1: A unpaired. Pairs: B-C, D-E
-        List<com.example.trainingplanner.dto.RegenerateRequest.PairDto> pairsEx1 = new ArrayList<>();
-        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("B", "C"));
-        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("D", "E"));
-        currentPairings.put("Exercise 1", pairsEx1);
-
-        // Add placeholder for Ex 2 (to be regenerated)
-        currentPairings.put("Exercise 2", new ArrayList<>());
-
-        request.setCurrentPairings(currentPairings);
-
-        Map<String, List<String>> unpaired = new java.util.HashMap<>();
-        unpaired.put("Exercise 1", java.util.Collections.singletonList("A"));
-        request.setUnpairedPlayers(unpaired);
-
-        // Regenerate
-        com.example.trainingplanner.dto.RegenerateResponse response = trainingPlanService
-                .regenerateRemainingExercises(request);
-
-        // Verify Ex 2 has the NEXT best pairing
-        // In this case, since everyone has the same Elo, we expect it to pick the next
-        // unique round
-        // which, due to our tie-breaking, should result in a different unpaired player.
-        List<Player> unpairedEx2 = response.getUnpairedPlayers().get("Exercise 2");
-        assertNotNull(unpairedEx2);
-        assertEquals(1, unpairedEx2.size());
-        assertNotEquals("A", unpairedEx2.get(0).getName());
-
-        System.out.println("Ex 1 Unpaired: A");
-        System.out.println("Ex 2 Unpaired: " + unpairedEx2.get(0).getName());
-    }
-
-    @Test
-    void generatePlan_shouldRotateUnpairedPlayers() throws Exception {
-        // Setup 5 players
-        List<Player> players = Arrays.asList(
-                new Player("A", 10), new Player("B", 10),
-                new Player("C", 10), new Player("D", 10),
-                new Player("E", 10));
-        csvServiceStub.setPlayers(players);
-
-        // Generate plan with 5 exercises (should cover all players unpaired once)
-        TrainingSession session = trainingPlanService.generatePlan(players, 5, 1);
-
-        assertNotNull(session);
-        assertEquals(5, session.getExercises().size());
-
-        // Collect unpaired players from all exercises
-        List<String> unpairedNames = new ArrayList<>();
-        for (com.example.trainingplanner.model.Exercise ex : session.getExercises()) {
-            List<Player> unpaired = session.getUnpairedPlayers().get(ex);
-            assertNotNull(unpaired);
-            assertEquals(1, unpaired.size());
-            unpairedNames.add(unpaired.get(0).getName());
+    private static List<Player> kids(int n) {
+        List<Player> players = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            players.add(new Player("Kind " + i, LEVELS[i % LEVELS.length]));
         }
+        return players;
+    }
 
-        // Verify all 5 players are unpaired exactly once
-        for (Player p : players) {
-            assertTrue(unpairedNames.contains(p.getName()), "Player " + p.getName() + " should be unpaired once");
-            assertEquals(1, java.util.Collections.frequency(unpairedNames, p.getName()),
-                    "Player " + p.getName() + " should be unpaired exactly once");
-        }
+    private static PlanSettings settings(int exercises, int balleimer, int perBalleimer, String... partners) {
+        return new PlanSettings(exercises, balleimer, perBalleimer, new ArrayList<>(List.of(partners)));
+    }
+
+    private static TrainingPlan generate(long seed, List<Player> players, PlanSettings settings) {
+        return new TrainingPlanService(new Random(seed)).generatePlan(players, settings, "3. Oktober");
+    }
+
+    private static List<String> namesIn(ExerciseRound round) {
+        List<String> names = new ArrayList<>();
+        round.getPairs().forEach(p -> {
+            names.add(p.getPlayer1().getName());
+            names.add(p.getPlayer2().getName());
+        });
+        round.getBalleimer().forEach(b -> b.forEach(p -> names.add(p.getName())));
+        round.getSparring().forEach(s -> names.add(s.getPlayer().getName()));
+        round.getUnpaired().forEach(p -> names.add(p.getName()));
+        return names;
+    }
+
+    private static String pairKey(PlayerPair pair) {
+        String a = pair.getPlayer1().getName();
+        String b = pair.getPlayer2().getName();
+        return a.compareTo(b) < 0 ? a + "|" + b : b + "|" + a;
     }
 
     @Test
-    void generatePlan_shouldHaveNoDuplicatePairs() throws Exception {
-        // Setup 6 players
-        List<Player> players = Arrays.asList(
-                new Player("A", 10), new Player("B", 10),
-                new Player("C", 10), new Player("D", 10),
-                new Player("E", 10), new Player("F", 10));
-        csvServiceStub.setPlayers(players);
-
-        // Generate plan with 3 exercises (max unique rounds for 6 players is 5 if we
-        // want zero overlap?)
-        // Total pairs = 6*5/2 = 15. Each exercise has 3 pairs.
-        // So we can have up to 5 exercises with zero overlap.
-        TrainingSession session = trainingPlanService.generatePlan(players, 4, 0);
-
-        assertNotNull(session);
-        assertEquals(4, session.getExercises().size());
-
-        Set<String> usedPairs = new HashSet<>();
-        for (com.example.trainingplanner.model.Exercise ex : session.getExercises()) {
-            List<com.example.trainingplanner.model.PlayerPair> pairs = session.getExercisePairs().get(ex);
-            for (com.example.trainingplanner.model.PlayerPair pair : pairs) {
-                String p1 = pair.getPlayer1().getName();
-                String p2 = pair.getPlayer2().getName();
-                String key = p1.compareTo(p2) < 0 ? p1 + "|" + p2 : p2 + "|" + p1;
-
-                assertFalse(usedPairs.contains(key), "Pair " + key + " is repeated in exercise " + ex.getName());
-                usedPairs.add(key);
+    void everyKidHasExactlyOnePlacePerExercise() {
+        List<Player> players = kids(20);
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(5, 2, 2, "Trainer A", "Trainer B"));
+            assertEquals(5, plan.getExercises().size());
+            for (ExerciseRound round : plan.getExercises()) {
+                List<String> names = namesIn(round);
+                assertEquals(20, names.size());
+                assertEquals(20, new HashSet<>(names).size(), "a kid has two places: " + names);
+                assertEquals(2, round.getBalleimer().size());
+                round.getBalleimer().forEach(b -> assertEquals(2, b.size()));
+                assertEquals(List.of("Trainer A", "Trainer B"),
+                        round.getSparring().stream().map(SparringAssignment::getPartner).toList());
+                assertEquals(7, round.getPairs().size());
+                assertTrue(round.getUnpaired().isEmpty());
             }
         }
     }
 
     @Test
-    void regenerateRemainingExercises_shouldRespectUniqueness() {
-        List<Player> players = Arrays.asList(
-                new Player("A", 10), new Player("B", 10),
-                new Player("C", 10), new Player("D", 10));
-
-        // Ex 1: A-B, C-D
-        com.example.trainingplanner.dto.RegenerateRequest request = new com.example.trainingplanner.dto.RegenerateRequest();
-        request.setExerciseIndex(0);
-        request.setAvailablePlayers(players);
-
-        Map<String, List<com.example.trainingplanner.dto.RegenerateRequest.PairDto>> current = new HashMap<>();
-        List<com.example.trainingplanner.dto.RegenerateRequest.PairDto> pairsEx1 = new ArrayList<>();
-        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("A", "B"));
-        pairsEx1.add(new com.example.trainingplanner.dto.RegenerateRequest.PairDto("C", "D"));
-        current.put("Exercise 1", pairsEx1);
-        current.put("Exercise 2", new ArrayList<>());
-        request.setCurrentPairings(current);
-
-        request.setUnpairedPlayers(new HashMap<>());
-
-        com.example.trainingplanner.dto.RegenerateResponse response = trainingPlanService
-                .regenerateRemainingExercises(request);
-
-        // Ex 2 pairs should NOT be A-B or C-D
-        List<com.example.trainingplanner.model.PlayerPair> pairsEx2 = response.getExercisePairs()
-                .get("Exercise 2");
-        for (com.example.trainingplanner.model.PlayerPair p : pairsEx2) {
-            String p1 = p.getPlayer1().getName();
-            String p2 = p.getPlayer2().getName();
-            String key = p1.compareTo(p2) < 0 ? p1 + "|" + p2 : p2 + "|" + p1;
-            assertNotEquals("A|B", key);
-            assertNotEquals("C|D", key);
+    void kidGoesToABalleimerAtMostOncePerSession() {
+        List<Player> players = kids(20);
+        for (long seed = 0; seed < 20; seed++) {
+            // 5 exercises × 2 Balleimer × 2 kids = all 20 kids exactly once
+            TrainingPlan plan = generate(seed, players, settings(5, 2, 2));
+            Set<String> seen = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                round.getBalleimer().forEach(b -> b.forEach(p -> assertTrue(seen.add(p.getName()),
+                        p.getName() + " is at a Balleimer twice")));
+            }
+            assertEquals(20, seen.size());
+            assertTrue(plan.getWarnings().isEmpty(), plan.getWarnings().toString());
         }
     }
 
-    // Manual Stub
-    static class CsvServiceStub extends CsvService {
-        private List<Player> players;
-
-        public void setPlayers(List<Player> players) {
-            this.players = players;
-        }
-
-        @Override
-        public List<Player> readPlayersForDate(String date) {
-            return players != null ? players : new ArrayList<>();
-        }
-
-        @Override
-        public List<com.example.trainingplanner.model.Exercise> readExercises() {
-            List<com.example.trainingplanner.model.Exercise> exercises = new ArrayList<>();
-            for (int i = 1; i <= 3; i++) {
-                com.example.trainingplanner.model.Exercise ex = new com.example.trainingplanner.model.Exercise();
-                ex.setName("Exercise " + i);
-                ex.setDurationMinutes(15);
-                exercises.add(ex);
+    @Test
+    void sparringPartnerNeverGetsTheSameKidTwice() {
+        List<Player> players = kids(12);
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(6, 1, 2, "Trainer A", "Trainer B", "Trainer C"));
+            Set<String> seen = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                for (SparringAssignment s : round.getSparring()) {
+                    assertTrue(seen.add(s.getPartner() + "|" + s.getPlayer().getName()),
+                            s.getPartner() + " has " + s.getPlayer().getName() + " twice");
+                }
             }
-            return exercises;
+        }
+    }
+
+    @Test
+    void pairsDoNotRepeatAndTheOddKidOutRotates() {
+        List<Player> players = kids(9);
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(6, 0, 2));
+            Set<String> pairs = new HashSet<>();
+            Set<String> sitOuts = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                round.getPairs().forEach(p -> assertTrue(pairs.add(pairKey(p)), pairKey(p) + " repeats"));
+                assertEquals(1, round.getUnpaired().size());
+                assertTrue(sitOuts.add(round.getUnpaired().get(0).getName()), "same kid sits out twice");
+            }
+            assertTrue(plan.getWarnings().isEmpty(), plan.getWarnings().toString());
+        }
+    }
+
+    @Test
+    void firstExercisePairsKidsOfTheSameLevel() {
+        List<Player> players = List.of(new Player("A", 1), new Player("B", 12), new Player("C", 1),
+                new Player("D", 12), new Player("E", 6), new Player("F", 6));
+        TrainingPlan plan = generate(1, new ArrayList<>(players), settings(1, 0, 2));
+        for (PlayerPair pair : plan.getExercises().get(0).getPairs()) {
+            assertEquals(pair.getPlayer1().getKlassierung(), pair.getPlayer2().getKlassierung());
+        }
+    }
+
+    @Test
+    void largeGroupsGenerateQuickly() {
+        // 20 kids with three off used to run for minutes
+        TrainingPlan plan = assertTimeoutPreemptively(Duration.ofSeconds(5),
+                () -> generate(7, kids(20), settings(6, 1, 2, "Trainer A")));
+        assertTrue(plan.getWarnings().isEmpty(), plan.getWarnings().toString());
+        TrainingPlan big = assertTimeoutPreemptively(Duration.ofSeconds(5),
+                () -> generate(7, kids(27), settings(10, 0, 2)));
+        assertTrue(big.getWarnings().isEmpty(), big.getWarnings().toString());
+    }
+
+    @Test
+    void moreExercisesThanTheGroupAllowsStillGivesAPlanWithWarnings() {
+        // 4 kids can only form 3 distinct rounds of pairs
+        TrainingPlan plan = generate(3, kids(4), settings(5, 0, 2));
+        assertEquals(5, plan.getExercises().size());
+        assertFalse(plan.getWarnings().isEmpty());
+    }
+
+    @Test
+    void tooFewKidsForTheBalleimerPlacesIsRejected() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> generate(0, kids(10), settings(6, 1, 2)));
+        assertTrue(e.getMessage().contains("nur einmal an einen Balleimer"), e.getMessage());
+    }
+
+    @Test
+    void moreStationPlacesThanKidsIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> generate(0, kids(4), settings(1, 2, 2, "Trainer A")));
+    }
+
+    @Test
+    void sparringPartnerWhoIsAlsoAPlayerIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> generate(0, kids(6), settings(2, 0, 2, "Kind 0")));
+    }
+
+    @Test
+    void regenerateKeepsEarlierExercisesAndRespectsWhatTheyUsed() {
+        List<Player> players = kids(16);
+        TrainingPlanService service = new TrainingPlanService(new Random(5));
+        TrainingPlan plan = service.generatePlan(players, settings(6, 1, 2, "Trainer A"), "3. Oktober");
+
+        TrainingPlan regenerated = service.regenerateFrom(plan, 1);
+
+        assertEquals(6, regenerated.getExercises().size());
+        assertSame(plan.getExercises().get(0), regenerated.getExercises().get(0));
+        assertSame(plan.getExercises().get(1), regenerated.getExercises().get(1));
+        Set<String> balleimer = new HashSet<>();
+        Set<String> pairs = new HashSet<>();
+        for (ExerciseRound round : regenerated.getExercises()) {
+            round.getBalleimer().forEach(b -> b.forEach(p -> assertTrue(balleimer.add(p.getName()))));
+            round.getPairs().forEach(p -> assertTrue(pairs.add(pairKey(p)), pairKey(p) + " repeats"));
         }
     }
 }
