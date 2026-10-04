@@ -29,6 +29,7 @@ public class PdfExportService {
     private static final Color LIGHT_BG = new Color(248, 249, 252);
     private static final Color BALLEIMER_BG = new Color(232, 245, 233); // Light green
     private static final Color SPARRING_BG = new Color(232, 240, 254); // Light blue
+    private static final Color MENTAL_BG = new Color(230, 244, 247); // Light teal
     private static final Color UNPAIRED_BG = new Color(255, 248, 225); // Light yellow
     private static final Color BORDER = new Color(220, 220, 220);
 
@@ -84,6 +85,14 @@ public class PdfExportService {
                     }
                 }
                 document.add(pairsTable);
+            }
+
+            List<Player> mental = exercise.getMentalTrainer();
+            if (mental != null && !mental.isEmpty()) {
+                Phrase phrase = new Phrase();
+                phrase.add(new Chunk("Mentaltrainer: ", LABEL_FONT));
+                phrase.add(new Chunk(names(mental), PAIR_FONT));
+                document.add(row(phrase, MENTAL_BG));
             }
 
             List<List<Player>> balleimer = exercise.getBalleimer();

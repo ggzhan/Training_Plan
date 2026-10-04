@@ -21,11 +21,16 @@ import java.util.Set;
 
 /**
  * Builds a training plan exercise by exercise. Within each exercise every kid gets
- * exactly one place: a Balleimer, a sparring partner, a pair, or (when the rest is
- * odd) no partner.
+ * exactly one place: the Mentaltrainer, a Balleimer, a sparring partner, a pair,
+ * or (when the rest is odd) no partner.
+ *
+ * The Mentaltrainer works in sessions of one or more consecutive exercises; the
+ * same kids stay for the whole session, and the strongest kids (highest
+ * Klassierung) who have not been yet go first.
  *
  * Rules, strongest first:
- * - a kid goes to a Balleimer at most once per session;
+ * - a kid goes to a Balleimer at most once per session (more only when there are
+ *   more Balleimer places than kids, fewest visits first);
  * - a kid meets each sparring partner at most once;
  * - two kids play each other at most once, and nobody is without a partner twice;
  * - pairs are as close in Klassierung as possible.
@@ -53,15 +58,8 @@ public class TrainingPlanService {
     public TrainingPlan generatePlan(List<Player> players, PlanSettings settings, String trainingDate) {
         PlanSettings clean = normalize(settings);
         validate(players, clean);
-
-        int balleimerPlaces = clean.getNumberOfExercises() * clean.balleimerSlots();
-        if (balleimerPlaces > players.size()) {
-            int maxExercises = players.size() / clean.balleimerSlots();
-            throw new IllegalArgumentException("Jedes Kind darf nur einmal an einen Balleimer. Mit "
-                    + clean.balleimerSlots() + " Balleimer-Plätzen pro Übung reicht es bei " + players.size()
-                    + " Kindern für höchstens " + maxExercises + (maxExercises == 1 ? " Übung." : " Übungen."));
-        }
-
+        // More Balleimer places than kids is allowed: kids with the fewest visits go
+        // first, and every second visit is listed in the warnings
         return build(players, clean, trainingDate, List.of());
     }
 
@@ -80,9 +78,13 @@ public class TrainingPlanService {
         kept.forEach(history::record);
 
         List<String> warnings = new ArrayList<>();
+        List<List<Player>> mentalSessions = scheduleMentalTrainer(players, settings, kept, warnings);
         List<ExerciseRound> exercises = new ArrayList<>(kept);
         for (int e = kept.size(); e < settings.getNumberOfExercises(); e++) {
-            ExerciseRound round = nextRound(players, settings, history, warnings, e + 1);
+            List<Player> mental = mentalSessions.isEmpty()
+                    ? List.of()
+                    : mentalSessions.get(e / settings.getMentalTrainerLength());
+            ExerciseRound round = nextRound(players, settings, history, warnings, e + 1, mental);
             history.record(round);
             exercises.add(round);
         }
@@ -96,12 +98,81 @@ public class TrainingPlanService {
         return plan;
     }
 
+    /**
+     * Picks the Mentaltrainer group for every session up front, since a group stays
+     * for several exercises. A session that already started in a kept exercise
+     * continues with the kids still present there; open places go to the strongest
+     * kids who have had the fewest sessions.
+     */
+    private List<List<Player>> scheduleMentalTrainer(List<Player> players, PlanSettings settings,
+            List<ExerciseRound> kept, List<String> warnings) {
+        int size = settings.getMentalTrainerKids();
+        int length = settings.getMentalTrainerLength();
+        if (size == 0) {
+            return List.of();
+        }
+        int sessions = (settings.getNumberOfExercises() + length - 1) / length;
+        Set<String> present = new HashSet<>();
+        players.forEach(p -> present.add(p.getName()));
+
+        // Sessions each kid already had, and the group of a session cut by keepThrough
+        Map<String, Integer> visits = new HashMap<>();
+        Map<Integer, List<Player>> started = new HashMap<>();
+        Map<Integer, Set<String>> keptSessionKids = new HashMap<>();
+        for (int e = 0; e < kept.size(); e++) {
+            int session = e / length;
+            List<Player> group = kept.get(e).getMentalTrainer() == null ? List.of() : kept.get(e).getMentalTrainer();
+            Set<String> names = keptSessionKids.computeIfAbsent(session, k -> new HashSet<>());
+            group.forEach(p -> names.add(p.getName()));
+            started.put(session, group);
+        }
+        keptSessionKids.values().forEach(names -> names.forEach(n -> visits.merge(n, 1, Integer::sum)));
+
+        List<List<Player>> schedule = new ArrayList<>();
+        for (int session = 0; session < sessions; session++) {
+            List<Player> group = new ArrayList<>();
+            if (started.containsKey(session)) {
+                for (Player p : started.get(session)) {
+                    if (present.contains(p.getName())) {
+                        group.add(findByName(players, p.getName()));
+                    }
+                }
+            }
+            if (group.size() < size) {
+                List<Player> candidates = new ArrayList<>(players);
+                candidates.removeIf(p -> group.stream().anyMatch(g -> g.getName().equals(p.getName())));
+                Collections.shuffle(candidates, random);
+                candidates.sort(Comparator.comparingInt((Player p) -> visits.getOrDefault(p.getName(), 0))
+                        .thenComparing(Comparator.comparingInt(Player::getKlassierung).reversed()));
+                for (Player p : candidates.subList(0, Math.min(size - group.size(), candidates.size()))) {
+                    if (visits.getOrDefault(p.getName(), 0) > 0) {
+                        warnings.add("Übung " + (session * length + 1) + ": " + p.getName()
+                                + " ist zum zweiten Mal beim Mentaltrainer.");
+                    }
+                    visits.merge(p.getName(), 1, Integer::sum);
+                    group.add(p);
+                }
+            }
+            group.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
+            schedule.add(group);
+        }
+        return schedule;
+    }
+
+    private static Player findByName(List<Player> players, String name) {
+        return players.stream().filter(p -> p.getName().equals(name)).findFirst().orElseThrow();
+    }
+
     private ExerciseRound nextRound(List<Player> players, PlanSettings settings, History history,
-            List<String> warnings, int exerciseNo) {
+            List<String> warnings, int exerciseNo, List<Player> mentalTrainer) {
         // Shuffle first so every stable sort below breaks ties differently each time
         List<Player> pool = new ArrayList<>(players);
         Collections.shuffle(pool, random);
         ExerciseRound round = new ExerciseRound();
+
+        // 0. Mentaltrainer: the group of this session, decided up front
+        round.setMentalTrainer(new ArrayList<>(mentalTrainer));
+        pool.removeIf(p -> mentalTrainer.stream().anyMatch(m -> m.getName().equals(p.getName())));
 
         // 1. Balleimer: kids who have not been at one yet
         int slots = settings.balleimerSlots();
@@ -295,7 +366,8 @@ public class TrainingPlanService {
                 }
             }
         }
-        return new PlanSettings(Math.max(1, s.getNumberOfExercises()), sizes, new ArrayList<>(partners));
+        return new PlanSettings(Math.max(1, s.getNumberOfExercises()), sizes, new ArrayList<>(partners),
+                Math.max(0, s.getMentalTrainerKids()), Math.max(1, s.getMentalTrainerLength()));
     }
 
     private void validate(List<Player> players, PlanSettings settings) {
@@ -314,10 +386,11 @@ public class TrainingPlanService {
                         + " steht in der Spielerliste und bei den Sparringpartnern – bitte nur an einer Stelle.");
             }
         }
-        int needed = settings.balleimerSlots() + settings.getSparringPartners().size();
+        int needed = settings.balleimerSlots() + settings.getSparringPartners().size()
+                + settings.getMentalTrainerKids();
         if (needed > players.size()) {
             throw new IllegalArgumentException("Pro Übung braucht es " + needed
-                    + " Kinder für Balleimer und Sparring, es sind aber nur " + players.size() + " da.");
+                    + " Kinder für Mentaltrainer, Balleimer und Sparring, es sind aber nur " + players.size() + " da.");
         }
     }
 

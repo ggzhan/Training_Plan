@@ -168,6 +168,8 @@ function loadSettings() {
     const saved = readStored(STORAGE_KEYS.settings);
     if (!saved) return;
     if (saved.numberOfExercises) $('numberOfExercises').value = saved.numberOfExercises;
+    if (saved.mentalTrainerKids != null) $('mentalTrainerKids').value = saved.mentalTrainerKids;
+    if (saved.mentalTrainerLength) $('mentalTrainerLength').value = saved.mentalTrainerLength;
     if (Array.isArray(saved.balleimerSizes)) {
         balleimerSizes = saved.balleimerSizes;
     } else if (saved.balleimerCount > 0) {
@@ -181,6 +183,8 @@ function currentSettings() {
     return {
         numberOfExercises: intValue('numberOfExercises'),
         balleimerSizes,
+        mentalTrainerKids: intValue('mentalTrainerKids'),
+        mentalTrainerLength: Math.max(1, intValue('mentalTrainerLength')),
         sparringPartners
     };
 }
@@ -299,35 +303,34 @@ function renderSparringPartners() {
 // Mirrors the server's checks; when the settings cannot work, says why and offers the fix
 function checkStations() {
     const summary = $('stationSummary');
-    const fix = $('fixSuggestion');
+    const warning = $('stationWarning');
     const kids = currentPlayers.length;
     const exercises = intValue('numberOfExercises');
     const atBuckets = balleimerSizes.reduce((sum, size) => sum + size, 0);
     const sparring = sparringPartners.length;
-    const playing = kids - atBuckets - sparring;
+    const mental = intValue('mentalTrainerKids');
+    const playing = kids - atBuckets - sparring - mental;
     const kidNames = new Set(currentPlayers.map(p => p.name));
     const clash = sparringPartners.find(name => kidNames.has(name));
+    $('mentalLengthRow').hidden = mental === 0;
 
     let error = null;
-    let fixAction = null;
     if (kids === 0) {
         error = 'Für dieses Datum ist niemand angemeldet.';
     } else if (clash) {
         error = `${clash} steht bei den Kindern und bei den Sparringpartnern. Bitte nur an einer Stelle eintragen.`;
     } else if (playing < 0) {
-        error = `Balleimer und Sparring brauchen ${atBuckets + sparring} Kinder pro Übung, es sind aber nur ${kids} da.`;
-    } else if (exercises * atBuckets > kids) {
-        const maxExercises = Math.floor(kids / atBuckets);
-        error = `Jedes Kind darf nur einmal an einen Balleimer. Mit ${atBuckets} Balleimer-Plätzen pro Übung `
-            + `reicht es für höchstens ${maxExercises} ${maxExercises === 1 ? 'Übung' : 'Übungen'}.`;
-        fixAction = {
-            label: `Auf ${maxExercises} ${maxExercises === 1 ? 'Übung' : 'Übungen'} setzen`,
-            run: () => {
-                $('numberOfExercises').value = maxExercises;
-                settingsChanged();
-            }
-        };
+        error = `Mentaltrainer, Balleimer und Sparring brauchen ${kids - playing} Kinder pro Übung, `
+            + `es sind aber nur ${kids} da.`;
     }
+
+    // Not blocking: more Balleimer places than kids means some kids go twice
+    const repeats = exercises * atBuckets - kids;
+    warning.hidden = !!error || repeats <= 0;
+    warning.textContent = repeats === 1
+        ? '1 Kind geht zweimal an einen Balleimer.'
+        : `${repeats} Kinder gehen zweimal an einen Balleimer.`;
+    if (repeats > kids) warning.textContent = 'Einige Kinder gehen mehrmals an einen Balleimer.';
 
     if (error) {
         summary.className = 'summary is-error';
@@ -336,16 +339,13 @@ function checkStations() {
         const parts = [];
         const pairs = Math.floor(playing / 2);
         parts.push(`${pairs} ${pairs === 1 ? 'Paar' : 'Paare'}`);
+        if (mental > 0) parts.push(`${mental} beim Mentaltrainer`);
         if (atBuckets > 0) parts.push(`${atBuckets} am Balleimer`);
         if (sparring > 0) parts.push(`${sparring} im Sparring`);
         if (playing % 2 === 1) parts.push('1 ohne Partner');
         summary.className = 'summary';
         summary.textContent = `${kids} Kinder · pro Übung: ${parts.join(' · ')}`;
     }
-
-    fix.hidden = !fixAction;
-    fix.onclick = fixAction ? fixAction.run : null;
-    fix.textContent = fixAction ? fixAction.label : '';
     $('generateBtn').disabled = !!error;
 }
 
@@ -399,7 +399,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-step]').forEach(btn =>
         btn.addEventListener('click', () => step(btn.dataset.for, parseInt(btn.dataset.step, 10))));
-    $('numberOfExercises').addEventListener('input', settingsChanged);
+    ['numberOfExercises', 'mentalTrainerKids', 'mentalTrainerLength'].forEach(id =>
+        $(id).addEventListener('input', settingsChanged));
     $('addBucketBtn').addEventListener('click', addBucket);
 
     $('addSparringBtn').addEventListener('click', addSparringPartner);

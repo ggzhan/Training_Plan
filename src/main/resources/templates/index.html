@@ -7,7 +7,7 @@
     <title>Trainingsplaner</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=2)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=3)}">
 </head>
 
 <body>
@@ -85,6 +85,32 @@
                 </div>
 
                 <div class="field" style="margin-top: var(--space-4);">
+                    <h3 class="field-label">Mentaltrainer</h3>
+                    <span class="field-help">Die stärksten Kinder (höchste Klassierung) gehen zuerst und bleiben
+                        für die ganze Einheit. 0 heisst kein Mentaltrainer.</span>
+                    <div class="stepper-row">
+                        <label for="mentalTrainerKids">Kinder pro Einheit</label>
+                        <div class="stepper">
+                            <button type="button" class="btn" data-step="-1" data-for="mentalTrainerKids"
+                                aria-label="Ein Kind weniger beim Mentaltrainer">−</button>
+                            <input type="number" id="mentalTrainerKids" inputmode="numeric" min="0" max="8" value="0">
+                            <button type="button" class="btn" data-step="1" data-for="mentalTrainerKids"
+                                aria-label="Ein Kind mehr beim Mentaltrainer">+</button>
+                        </div>
+                    </div>
+                    <div class="stepper-row" id="mentalLengthRow">
+                        <label for="mentalTrainerLength">Übungen pro Einheit</label>
+                        <div class="stepper">
+                            <button type="button" class="btn" data-step="-1" data-for="mentalTrainerLength"
+                                aria-label="Einheit eine Übung kürzer">−</button>
+                            <input type="number" id="mentalTrainerLength" inputmode="numeric" min="1" max="4" value="1">
+                            <button type="button" class="btn" data-step="1" data-for="mentalTrainerLength"
+                                aria-label="Einheit eine Übung länger">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top: var(--space-4);">
                     <label for="sparringName" class="field-label">Sparringpartner</label>
                     <span class="field-help" id="sparringHelp">Trainer oder Helfer, die pro Übung mit einem Kind
                         spielen.</span>
@@ -101,7 +127,7 @@
         <div class="actionbar">
             <div class="actionbar-inner">
                 <p id="stationSummary" class="summary" aria-live="polite"></p>
-                <button type="button" id="fixSuggestion" class="btn btn-secondary btn-wrap" hidden></button>
+                <p id="stationWarning" class="summary is-warning" hidden></p>
                 <button type="submit" id="generateBtn" class="btn btn-primary btn-lg">Plan erstellen</button>
             </div>
         </div>
@@ -138,7 +164,7 @@
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
 
     <script th:src="@{/js/common.js(v=1)}"></script>
-    <script th:src="@{/js/index.js(v=3)}"></script>
+    <script th:src="@{/js/index.js(v=4)}"></script>
 </body>
 
 </html>

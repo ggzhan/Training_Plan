@@ -18,6 +18,8 @@
     --bucket-soft: oklch(0.95 0.035 150);
     --sparring: oklch(0.45 0.11 55);
     --sparring-soft: oklch(0.955 0.035 70);
+    --mental: oklch(0.42 0.08 205);
+    --mental-soft: oklch(0.95 0.03 205);
     --danger: oklch(0.48 0.17 27);
     --danger-soft: oklch(0.95 0.03 27);
     --radius: 12px;
@@ -91,6 +93,22 @@ h1, h2, h3 {
 .topbar h1 {
     font-size: 1.5rem;
     font-weight: 700;
+}
+
+/* Plan page: title and button share a row, the summary gets the full width */
+.topbar-plan {
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+
+.topbar-plan h1 {
+    flex: 1;
+    min-width: 0;
+    font-size: 1.375rem;
+}
+
+.topbar-plan .meta {
+    flex-basis: 100%;
 }
 
 .topbar .meta {
@@ -543,6 +561,11 @@ h3.field-label {
     color: var(--ink-2);
 }
 
+.summary.is-warning {
+    color: var(--sparring);
+    font-weight: 600;
+}
+
 .summary.is-error {
     color: var(--danger);
     font-weight: 600;
@@ -710,6 +733,14 @@ h3.field-label {
     color: var(--sparring);
 }
 
+.row-mental {
+    background: var(--mental-soft);
+}
+
+.row-mental .tag {
+    color: var(--mental);
+}
+
 .row-pause .tag {
     color: var(--ink-2);
 }
@@ -733,6 +764,10 @@ h3.field-label {
 
 .slot-group.row-bucket .tag {
     color: var(--bucket);
+}
+
+.slot-group.row-mental .tag {
+    color: var(--mental);
 }
 
 .slot-group.row-sparring .tag {

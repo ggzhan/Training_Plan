@@ -47,6 +47,7 @@ class TrainingPlanServiceTest {
         round.getBalleimer().forEach(b -> b.forEach(p -> names.add(p.getName())));
         round.getSparring().forEach(s -> names.add(s.getPlayer().getName()));
         round.getUnpaired().forEach(p -> names.add(p.getName()));
+        round.getMentalTrainer().forEach(p -> names.add(p.getName()));
         return names;
     }
 
@@ -153,10 +154,16 @@ class TrainingPlanServiceTest {
     }
 
     @Test
-    void tooFewKidsForTheBalleimerPlacesIsRejected() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> generate(0, kids(10), settings(6, 1, 2)));
-        assertTrue(e.getMessage().contains("nur einmal an einen Balleimer"), e.getMessage());
+    void moreBalleimerPlacesThanKidsSpreadsRepeatsAndWarns() {
+        // 6 exercises × 2 places = 12 places for 10 kids: 2 kids go twice, nobody three times
+        TrainingPlan plan = generate(0, kids(10), settings(6, 1, 2));
+        java.util.Map<String, Integer> visits = new java.util.HashMap<>();
+        plan.getExercises().forEach(round ->
+                round.getBalleimer().forEach(b -> b.forEach(p -> visits.merge(p.getName(), 1, Integer::sum))));
+        assertEquals(10, visits.size());
+        assertEquals(2, visits.values().stream().filter(v -> v == 2).count());
+        assertTrue(visits.values().stream().allMatch(v -> v <= 2));
+        assertTrue(plan.getWarnings().stream().anyMatch(w -> w.contains("zum zweiten Mal am Balleimer")));
     }
 
     @Test
@@ -238,5 +245,65 @@ class TrainingPlanServiceTest {
         assertEquals(List.of(3, 3), plan.getSettings().getBalleimerSizes());
         plan.getExercises().forEach(round ->
                 assertEquals(List.of(3, 3), round.getBalleimer().stream().map(List::size).toList()));
+    }
+
+    private static List<Player> rankedKids(int n) {
+        // Kind 0 is strongest (Klassierung n), Kind n-1 weakest (1)
+        List<Player> players = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            players.add(new Player("Kind " + i, n - i));
+        }
+        return players;
+    }
+
+    private static List<String> mentalNames(ExerciseRound round) {
+        return round.getMentalTrainer().stream().map(Player::getName).sorted().toList();
+    }
+
+    @Test
+    void mentalTrainerTakesTheStrongestKidsForWholeSessions() {
+        PlanSettings s = new PlanSettings(5, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 3, 2);
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, rankedKids(14), s);
+            List<ExerciseRound> ex = plan.getExercises();
+            assertEquals(List.of("Kind 0", "Kind 1", "Kind 2"), mentalNames(ex.get(0)));
+            assertEquals(mentalNames(ex.get(0)), mentalNames(ex.get(1)));
+            assertEquals(List.of("Kind 3", "Kind 4", "Kind 5"), mentalNames(ex.get(2)));
+            assertEquals(mentalNames(ex.get(2)), mentalNames(ex.get(3)));
+            // Session 3 is only Übung 5, still the next strongest
+            assertEquals(List.of("Kind 6", "Kind 7", "Kind 8"), mentalNames(ex.get(4)));
+            for (ExerciseRound round : ex) {
+                List<String> names = namesIn(round);
+                assertEquals(14, names.size());
+                assertEquals(14, new HashSet<>(names).size(), "a kid has two places: " + names);
+            }
+            assertTrue(plan.getWarnings().isEmpty(), plan.getWarnings().toString());
+        }
+    }
+
+    @Test
+    void mentalTrainerRepeatsStrongestFirstOnlyWhenEveryoneHasBeen() {
+        // 4 sessions × 2 kids = 8 places for 6 kids
+        PlanSettings s = new PlanSettings(4, new ArrayList<>(), new ArrayList<>(), 2, 1);
+        TrainingPlan plan = generate(2, rankedKids(6), s);
+        assertEquals(List.of("Kind 0", "Kind 1"), mentalNames(plan.getExercises().get(3)));
+        assertTrue(plan.getWarnings().stream().anyMatch(w -> w.contains("zum zweiten Mal beim Mentaltrainer")));
+    }
+
+    @Test
+    void replanningMidSessionKeepsTheMentalTrainerGroup() {
+        TrainingPlanService service = new TrainingPlanService(new Random(4));
+        PlanSettings s = new PlanSettings(4, new ArrayList<>(), new ArrayList<>(), 2, 2);
+        TrainingPlan plan = service.generatePlan(rankedKids(10), s, "3. Oktober");
+
+        // Kind 1 (in the first session) goes home after Übung 1
+        List<Player> present = new ArrayList<>(plan.getPlayers());
+        present.removeIf(p -> p.getName().equals("Kind 1"));
+        plan.setPlayers(present);
+        TrainingPlan adjusted = service.regenerateFrom(plan, 0);
+
+        // Kind 0 stays for Übung 2; the open place goes to the strongest kid not yet there
+        assertEquals(List.of("Kind 0", "Kind 2"), mentalNames(adjusted.getExercises().get(1)));
+        assertEquals(List.of("Kind 3", "Kind 4"), mentalNames(adjusted.getExercises().get(2)));
     }
 }

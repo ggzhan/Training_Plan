@@ -1,8 +1,8 @@
 // Plan page: shows the stored plan, edits one exercise at a time, adjusts the
 // plan to who is actually there, undo/redo, PDF.
 //
-// Every kid has exactly one place per exercise (pair, Balleimer, sparring or
-// ohne Partner). Editing changes a place by swapping with whoever holds the chosen
+// Every kid has exactly one place per exercise (pair, Mentaltrainer, Balleimer,
+// sparring or ohne Partner). Editing changes a place by swapping with whoever holds the chosen
 // kid, so an exercise always stays complete. The plan is saved in the browser
 // after every change, so reload and back never lose it.
 
@@ -33,6 +33,19 @@ function playerByName(name) {
 
 function exerciseLabel(n) {
     return `Übung ${n}`;
+}
+
+function mentalLength() {
+    return Math.max(1, (plan.settings && plan.settings.mentalTrainerLength) || 1);
+}
+
+// "Übung 3–4" for the Mentaltrainer session an exercise belongs to
+function mentalSessionLabel(index) {
+    const length = mentalLength();
+    if (length === 1) return '';
+    const first = index - (index % length) + 1;
+    const last = Math.min(first + length - 1, plan.exercises.length);
+    return first === last ? `Übung ${first}` : `Übung ${first}–${last}`;
 }
 
 // ===== HISTORY =====
@@ -80,6 +93,9 @@ function slotsOf(ex) {
         slots.push({ get: () => pair.player1, set: p => { pair.player1 = p; } });
         slots.push({ get: () => pair.player2, set: p => { pair.player2 = p; } });
     });
+    ex.mentalTrainer.forEach((_, i) => {
+        slots.push({ get: () => ex.mentalTrainer[i], set: p => { ex.mentalTrainer[i] = p; } });
+    });
     ex.balleimer.forEach(bucket => bucket.forEach((_, i) => {
         slots.push({ get: () => bucket[i], set: p => { bucket[i] = p; } });
     }));
@@ -111,6 +127,13 @@ function changeSlot(slotIndex, name) {
 // What this exercise repeats from earlier ones; recomputed after every change
 function hintsFor(index, ex) {
     const hints = [];
+    const length = mentalLength();
+    if (length > 1 && index % length !== 0 && ex.mentalTrainer.length > 0) {
+        const previous = plan.exercises[index - 1].mentalTrainer.map(p => p.name).sort().join('|');
+        if (previous !== ex.mentalTrainer.map(p => p.name).sort().join('|')) {
+            hints.push(`Die Mentaltrainer-Gruppe ist anders als in ${exerciseLabel(index)}, obwohl die Einheit weiterläuft.`);
+        }
+    }
     const pairKey = (a, b) => [a, b].sort().join('\u0000');
     for (let e = 0; e < index; e++) {
         const earlier = plan.exercises[e];
@@ -152,6 +175,7 @@ function render() {
         return;
     }
     plan.absent = plan.absent || [];
+    plan.exercises.forEach(ex => { ex.mentalTrainer = ex.mentalTrainer || []; });
 
     $('planTitle').textContent = plan.trainingDate ? `Training ${plan.trainingDate}` : 'Trainingsplan';
     document.title = plan.trainingDate ? `Trainingsplan ${plan.trainingDate}` : 'Trainingsplan';
@@ -160,6 +184,10 @@ function render() {
     const sizes = s.balleimerSizes || Array(s.balleimerCount || 0).fill(s.playersPerBalleimer);
     if (sizes.length === 1) meta.push(`1 Balleimer (${sizes[0]})`);
     else if (sizes.length > 1) meta.push(`${sizes.length} Balleimer (${sizes.join(' + ')})`);
+    if (s.mentalTrainerKids > 0) {
+        meta.push(`Mentaltrainer: ${s.mentalTrainerKids} ${s.mentalTrainerKids === 1 ? 'Kind' : 'Kinder'}`
+            + (mentalLength() > 1 ? ` für ${mentalLength()} Übungen` : ''));
+    }
     if (s.sparringPartners.length > 0) meta.push(`Sparring: ${s.sparringPartners.join(', ')}`);
     $('planMeta').textContent = meta.join(' · ');
 
@@ -207,6 +235,12 @@ function renderViewCard(ex, index) {
             + '</ul>';
     }
     const stations = [];
+    if (ex.mentalTrainer.length > 0) {
+        const session = mentalSessionLabel(index);
+        stations.push(`<li class="row row-mental">
+        <span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer${session ? ` · ${session}` : ''}</span>
+        ${names(ex.mentalTrainer)}</li>`);
+    }
     ex.balleimer.forEach((bucket, b) => stations.push(`<li class="row row-bucket">
         <span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span> ${names(bucket)}</li>`));
     ex.sparring.forEach(sp => stations.push(`<li class="row row-sparring">
@@ -245,6 +279,10 @@ function renderEditCard(index) {
         body += `<div class="slot-group"><span class="tag">Paar ${n + 1}</span>
             ${select(p.player1, `Paar ${n + 1}, erstes Kind`)}${select(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
     });
+    if (draft.mentalTrainer.length > 0) {
+        body += `<div class="slot-group row-mental"><span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer</span>
+            ${draft.mentalTrainer.map((p, k) => select(p, `Mentaltrainer, Kind ${k + 1}`)).join('')}</div>`;
+    }
     draft.balleimer.forEach((bucket, b) => {
         body += `<div class="slot-group row-bucket"><span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span>
             ${bucket.map((p, k) => select(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;

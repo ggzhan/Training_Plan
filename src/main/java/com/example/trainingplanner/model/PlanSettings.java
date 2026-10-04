@@ -9,6 +9,10 @@ public class PlanSettings {
     // Kids per Balleimer, one entry per Balleimer, e.g. [3, 2]
     private List<Integer> balleimerSizes = new ArrayList<>();
     private List<String> sparringPartners = new ArrayList<>();
+    // Kids with the Mentaltrainer at once (0 = no Mentaltrainer), and how many
+    // consecutive Übungen one session lasts
+    private int mentalTrainerKids;
+    private int mentalTrainerLength = 1;
 
     // Plans saved before per-Balleimer sizes had one count and one size for all
     private int legacyBalleimerCount;
@@ -18,9 +22,16 @@ public class PlanSettings {
     }
 
     public PlanSettings(int numberOfExercises, List<Integer> balleimerSizes, List<String> sparringPartners) {
+        this(numberOfExercises, balleimerSizes, sparringPartners, 0, 1);
+    }
+
+    public PlanSettings(int numberOfExercises, List<Integer> balleimerSizes, List<String> sparringPartners,
+            int mentalTrainerKids, int mentalTrainerLength) {
         this.numberOfExercises = numberOfExercises;
         this.balleimerSizes = balleimerSizes;
         this.sparringPartners = sparringPartners;
+        this.mentalTrainerKids = mentalTrainerKids;
+        this.mentalTrainerLength = mentalTrainerLength;
     }
 
     public int getNumberOfExercises() {
@@ -57,6 +68,22 @@ public class PlanSettings {
 
     public void setSparringPartners(List<String> sparringPartners) {
         this.sparringPartners = sparringPartners;
+    }
+
+    public int getMentalTrainerKids() {
+        return mentalTrainerKids;
+    }
+
+    public void setMentalTrainerKids(int mentalTrainerKids) {
+        this.mentalTrainerKids = mentalTrainerKids;
+    }
+
+    public int getMentalTrainerLength() {
+        return mentalTrainerLength;
+    }
+
+    public void setMentalTrainerLength(int mentalTrainerLength) {
+        this.mentalTrainerLength = mentalTrainerLength;
     }
 
     public int balleimerSlots() {
