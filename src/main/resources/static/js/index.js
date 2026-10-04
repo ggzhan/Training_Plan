@@ -3,6 +3,7 @@
 let currentPlayers = [];
 let sparringPartners = [];
 let balleimerSizes = []; // kids per Balleimer, one entry per Balleimer
+let mentalPicks = []; // kid names chosen for the Mentaltrainer, in order
 const MAX_BALLEIMER = 6;
 const MAX_PER_BALLEIMER = 8;
 let editingPlayerIndex = null;
@@ -177,6 +178,7 @@ function loadSettings() {
         balleimerSizes = Array(saved.balleimerCount).fill(saved.playersPerBalleimer || 2);
     }
     if (Array.isArray(saved.sparringPartners)) sparringPartners = saved.sparringPartners;
+    if (Array.isArray(saved.mentalTrainerPicks)) mentalPicks = saved.mentalTrainerPicks;
 }
 
 function currentSettings() {
@@ -185,6 +187,7 @@ function currentSettings() {
         balleimerSizes,
         mentalTrainerKids: intValue('mentalTrainerKids'),
         mentalTrainerLength: Math.max(1, intValue('mentalTrainerLength')),
+        mentalTrainerPicks: mentalPicks,
         sparringPartners
     };
 }
@@ -209,6 +212,98 @@ const MENTAL_OPEN_KEY = 'trainingsplaner.mentalOpen';
 function setMentalOpen(open) {
     $('mentalBody').hidden = !open;
     $('toggleMental').setAttribute('aria-expanded', String(open));
+}
+
+// Which Einheit each pick lands in, given today's kids and the current settings
+function renderMentalPicks() {
+    const perSession = intValue('mentalTrainerKids');
+    const length = Math.max(1, intValue('mentalTrainerLength'));
+    const exercises = Math.max(1, intValue('numberOfExercises'));
+    const sessions = Math.ceil(exercises / length);
+    const present = new Map(currentPlayers.map(p => [p.name, p]));
+
+    const select = $('mentalPickSelect');
+    const options = currentPlayers.filter(p => !mentalPicks.includes(p.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    select.innerHTML = '<option value="">Kind wählen…</option>' + options.map(p =>
+        `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.klassierung})</option>`).join('');
+    select.disabled = options.length === 0;
+    $('addMentalPick').disabled = options.length === 0;
+
+    const list = $('mentalPickList');
+    list.innerHTML = '';
+    let order = 0; // position among picks who are here today
+    let notPlaced = 0;
+    mentalPicks.forEach((name, index) => {
+        const kid = present.get(name);
+        let where;
+        let off = false;
+        if (!kid) {
+            where = 'Heute nicht angemeldet';
+            off = true;
+        } else if (perSession === 0) {
+            where = 'Kinder pro Einheit ist 0';
+            off = true;
+        } else {
+            const session = Math.floor(order / perSession);
+            order++;
+            if (session >= sessions) {
+                where = 'Kommt nicht dran – zu wenig Plätze';
+                off = true;
+                notPlaced++;
+            } else {
+                const first = session * length + 1;
+                const last = Math.min(first + length - 1, exercises);
+                where = `Einheit ${session + 1} · ${first === last ? `Übung ${first}` : `Übung ${first}–${last}`}`;
+            }
+        }
+        const item = document.createElement('li');
+        item.innerHTML = `
+            <span class="pick-pos" aria-hidden="true">${index + 1}</span>
+            <span class="pick-text">
+                <span class="name">${escapeHtml(name)}${kid ? ` (${kid.klassierung})` : ''}</span>
+                <span class="where${off ? ' is-off' : ''}">${escapeHtml(where)}</span>
+            </span>
+            <button type="button" class="btn btn-icon btn-quiet" aria-label="${escapeHtml(name)} nach vorne"${index === 0 ? ' disabled' : ''}>
+                <i class="bi bi-arrow-up" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="${escapeHtml(name)} entfernen">
+                <i class="bi bi-x-lg" aria-hidden="true"></i></button>`;
+        const [up, remove] = item.querySelectorAll('button');
+        up.addEventListener('click', () => moveMentalPick(index));
+        remove.addEventListener('click', () => removeMentalPick(index));
+        list.appendChild(item);
+    });
+
+    const note = $('mentalPickNote');
+    note.hidden = notPlaced === 0;
+    note.textContent = `${notPlaced} ${notPlaced === 1 ? 'Kind kommt' : 'Kinder kommen'} nicht dran: `
+        + `${sessions} ${sessions === 1 ? 'Einheit' : 'Einheiten'} × ${perSession} Kinder.`;
+}
+
+function addMentalPick() {
+    const name = $('mentalPickSelect').value;
+    if (!name || mentalPicks.includes(name)) return;
+    mentalPicks.push(name);
+    settingsChanged();
+    $('mentalPickSelect').focus();
+}
+
+function moveMentalPick(index) {
+    if (index === 0) return;
+    [mentalPicks[index - 1], mentalPicks[index]] = [mentalPicks[index], mentalPicks[index - 1]];
+    settingsChanged();
+}
+
+function removeMentalPick(index) {
+    const [name] = mentalPicks.splice(index, 1);
+    settingsChanged();
+    toast(`${name} nicht mehr ausgewählt`, {
+        label: 'Rückgängig',
+        run: () => {
+            mentalPicks.splice(index, 0, name);
+            settingsChanged();
+        }
+    });
 }
 
 // ===== BALLEIMER =====
@@ -322,9 +417,12 @@ function checkStations() {
     const kidNames = new Set(currentPlayers.map(p => p.name));
     const clash = sparringPartners.find(name => kidNames.has(name));
     const length = Math.max(1, intValue('mentalTrainerLength'));
+    const picked = mentalPicks.filter(name => kidNames.has(name)).length;
     $('mentalSummary').textContent = mental === 0
         ? 'Aus'
-        : `${mental} ${mental === 1 ? 'Kind' : 'Kinder'} · ${length} ${length === 1 ? 'Übung' : 'Übungen'}`;
+        : `${mental} ${mental === 1 ? 'Kind' : 'Kinder'} · ${length} ${length === 1 ? 'Übung' : 'Übungen'}`
+            + (picked > 0 ? ` · ${picked} ausgewählt` : '');
+    renderMentalPicks();
 
     let error = null;
     if (kids === 0) {
@@ -412,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-step]').forEach(btn =>
         btn.addEventListener('click', () => step(btn.dataset.for, parseInt(btn.dataset.step, 10))));
     setMentalOpen(readStored(MENTAL_OPEN_KEY) === true);
+    $('addMentalPick').addEventListener('click', addMentalPick);
     $('toggleMental').addEventListener('click', () => {
         const open = $('toggleMental').getAttribute('aria-expanded') !== 'true';
         setMentalOpen(open);

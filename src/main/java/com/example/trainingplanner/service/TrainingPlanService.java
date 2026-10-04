@@ -25,8 +25,9 @@ import java.util.Set;
  * or (when the rest is odd) no partner.
  *
  * The Mentaltrainer works in sessions of one or more consecutive exercises; the
- * same kids stay for the whole session, and the strongest kids (highest
- * Klassierung) who have not been yet go first.
+ * same kids stay for the whole session. Kids picked by hand go first, in the
+ * order picked; open places go to the strongest kids (highest Klassierung) who
+ * have not been yet.
  *
  * Rules, strongest first:
  * - a kid goes to a Balleimer at most once per session (more only when there are
@@ -101,8 +102,8 @@ public class TrainingPlanService {
     /**
      * Picks the Mentaltrainer group for every session up front, since a group stays
      * for several exercises. A session that already started in a kept exercise
-     * continues with the kids still present there; open places go to the strongest
-     * kids who have had the fewest sessions.
+     * continues with the kids still present there; open places go first to the
+     * hand-picked kids in order, then to the strongest kids with the fewest sessions.
      */
     private List<List<Player>> scheduleMentalTrainer(List<Player> players, PlanSettings settings,
             List<ExerciseRound> kept, List<String> warnings) {
@@ -128,6 +129,15 @@ public class TrainingPlanService {
         }
         keptSessionKids.values().forEach(names -> names.forEach(n -> visits.merge(n, 1, Integer::sum)));
 
+        // Picks still present who have not had a session, in the order picked
+        List<Player> picks = new ArrayList<>();
+        for (String name : settings.getMentalTrainerPicks()) {
+            if (present.contains(name) && visits.getOrDefault(name, 0) == 0
+                    && picks.stream().noneMatch(p -> p.getName().equals(name))) {
+                picks.add(findByName(players, name));
+            }
+        }
+
         List<List<Player>> schedule = new ArrayList<>();
         for (int session = 0; session < sessions; session++) {
             List<Player> group = new ArrayList<>();
@@ -136,6 +146,13 @@ public class TrainingPlanService {
                     if (present.contains(p.getName())) {
                         group.add(findByName(players, p.getName()));
                     }
+                }
+            }
+            while (group.size() < size && !picks.isEmpty()) {
+                Player p = picks.remove(0);
+                if (group.stream().noneMatch(g -> g.getName().equals(p.getName()))) {
+                    visits.merge(p.getName(), 1, Integer::sum);
+                    group.add(p);
                 }
             }
             if (group.size() < size) {
@@ -366,8 +383,15 @@ public class TrainingPlanService {
                 }
             }
         }
-        return new PlanSettings(Math.max(1, s.getNumberOfExercises()), sizes, new ArrayList<>(partners),
+        PlanSettings clean = new PlanSettings(Math.max(1, s.getNumberOfExercises()), sizes, new ArrayList<>(partners),
                 Math.max(0, s.getMentalTrainerKids()), Math.max(1, s.getMentalTrainerLength()));
+        if (s.getMentalTrainerPicks() != null) {
+            List<String> picks = new ArrayList<>();
+            s.getMentalTrainerPicks().stream().filter(n -> n != null && !n.isBlank()).map(String::trim)
+                    .distinct().forEach(picks::add);
+            clean.setMentalTrainerPicks(picks);
+        }
+        return clean;
     }
 
     private void validate(List<Player> players, PlanSettings settings) {

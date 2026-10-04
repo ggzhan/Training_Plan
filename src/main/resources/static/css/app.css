@@ -226,6 +226,10 @@ h1, h2, h3 {
     color: var(--danger);
 }
 
+.btn-quiet:disabled {
+    opacity: 0.3;
+}
+
 .btn-icon {
     width: var(--tap);
     padding: 0;
@@ -456,6 +460,57 @@ select.control {
 
 h3.field-label {
     font-size: 1rem;
+}
+
+/* Hand-picked Mentaltrainer kids, in order */
+.pick-list {
+    list-style: none;
+    margin: var(--space-2) 0 0;
+    padding: 0;
+}
+
+.pick-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 52px;
+    border-bottom: 1px solid var(--line);
+}
+
+.pick-pos {
+    flex: 0 0 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--mental-soft);
+    color: var(--mental);
+    font-weight: 700;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pick-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pick-text .name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.pick-text .where {
+    color: var(--ink-2);
+    font-size: 0.875rem;
+}
+
+.pick-text .where.is-off {
+    color: var(--sparring);
+    font-weight: 600;
 }
 
 /* ===== Chips ===== */

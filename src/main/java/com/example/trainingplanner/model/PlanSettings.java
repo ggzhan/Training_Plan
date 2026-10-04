@@ -13,6 +13,8 @@ public class PlanSettings {
     // consecutive Übungen one session lasts
     private int mentalTrainerKids;
     private int mentalTrainerLength = 1;
+    // Kids chosen by hand, in the order they fill the Mentaltrainer sessions
+    private List<String> mentalTrainerPicks = new ArrayList<>();
 
     // Plans saved before per-Balleimer sizes had one count and one size for all
     private int legacyBalleimerCount;
@@ -84,6 +86,14 @@ public class PlanSettings {
 
     public void setMentalTrainerLength(int mentalTrainerLength) {
         this.mentalTrainerLength = mentalTrainerLength;
+    }
+
+    public List<String> getMentalTrainerPicks() {
+        return mentalTrainerPicks;
+    }
+
+    public void setMentalTrainerPicks(List<String> mentalTrainerPicks) {
+        this.mentalTrainerPicks = mentalTrainerPicks;
     }
 
     public int balleimerSlots() {

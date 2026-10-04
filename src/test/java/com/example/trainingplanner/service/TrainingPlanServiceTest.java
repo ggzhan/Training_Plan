@@ -306,4 +306,34 @@ class TrainingPlanServiceTest {
         assertEquals(List.of("Kind 0", "Kind 2"), mentalNames(adjusted.getExercises().get(1)));
         assertEquals(List.of("Kind 3", "Kind 4"), mentalNames(adjusted.getExercises().get(2)));
     }
+
+    @Test
+    void handPickedKidsFillTheMentalTrainerInTheOrderPicked() {
+        PlanSettings s = new PlanSettings(6, new ArrayList<>(), new ArrayList<>(), 2, 2);
+        // Weak kids picked first; "Nicht da" is not in today's list and is skipped
+        s.setMentalTrainerPicks(new ArrayList<>(List.of("Kind 9", "Nicht da", "Kind 7", "Kind 8")));
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, rankedKids(10), s);
+            List<ExerciseRound> ex = plan.getExercises();
+            assertEquals(List.of("Kind 7", "Kind 9"), mentalNames(ex.get(0)));
+            assertEquals(mentalNames(ex.get(0)), mentalNames(ex.get(1)));
+            // Kind 8 is the last pick; the open place goes to the strongest kid
+            assertEquals(List.of("Kind 0", "Kind 8"), mentalNames(ex.get(2)));
+            assertEquals(List.of("Kind 1", "Kind 2"), mentalNames(ex.get(4)));
+        }
+    }
+
+    @Test
+    void replanningSkipsPicksWhoAlreadyHadTheirSession() {
+        TrainingPlanService service = new TrainingPlanService(new Random(6));
+        PlanSettings s = new PlanSettings(4, new ArrayList<>(), new ArrayList<>(), 1, 1);
+        s.setMentalTrainerPicks(new ArrayList<>(List.of("Kind 5", "Kind 6")));
+        TrainingPlan plan = service.generatePlan(rankedKids(8), s, "3. Oktober");
+        assertEquals(List.of("Kind 5"), mentalNames(plan.getExercises().get(0)));
+
+        TrainingPlan adjusted = service.regenerateFrom(plan, 0);
+
+        assertEquals(List.of("Kind 6"), mentalNames(adjusted.getExercises().get(1)));
+        assertEquals(List.of("Kind 0"), mentalNames(adjusted.getExercises().get(2)));
+    }
 }
