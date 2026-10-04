@@ -202,6 +202,15 @@ function step(id, delta) {
     settingsChanged();
 }
 
+// ===== MENTALTRAINER =====
+// Whether the block is open is a per-browser convenience
+const MENTAL_OPEN_KEY = 'trainingsplaner.mentalOpen';
+
+function setMentalOpen(open) {
+    $('mentalBody').hidden = !open;
+    $('toggleMental').setAttribute('aria-expanded', String(open));
+}
+
 // ===== BALLEIMER =====
 function renderBalleimer() {
     const list = $('bucketList');
@@ -312,7 +321,10 @@ function checkStations() {
     const playing = kids - atBuckets - sparring - mental;
     const kidNames = new Set(currentPlayers.map(p => p.name));
     const clash = sparringPartners.find(name => kidNames.has(name));
-    $('mentalLengthRow').hidden = mental === 0;
+    const length = Math.max(1, intValue('mentalTrainerLength'));
+    $('mentalSummary').textContent = mental === 0
+        ? 'Aus'
+        : `${mental} ${mental === 1 ? 'Kind' : 'Kinder'} · ${length} ${length === 1 ? 'Übung' : 'Übungen'}`;
 
     let error = null;
     if (kids === 0) {
@@ -399,6 +411,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-step]').forEach(btn =>
         btn.addEventListener('click', () => step(btn.dataset.for, parseInt(btn.dataset.step, 10))));
+    setMentalOpen(readStored(MENTAL_OPEN_KEY) === true);
+    $('toggleMental').addEventListener('click', () => {
+        const open = $('toggleMental').getAttribute('aria-expanded') !== 'true';
+        setMentalOpen(open);
+        writeStored(MENTAL_OPEN_KEY, open);
+    });
     ['numberOfExercises', 'mentalTrainerKids', 'mentalTrainerLength'].forEach(id =>
         $(id).addEventListener('input', settingsChanged));
     $('addBucketBtn').addEventListener('click', addBucket);
