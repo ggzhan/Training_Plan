@@ -307,6 +307,40 @@ function removeMentalPick(index) {
 }
 
 // ===== BALLEIMER =====
+// One tap that makes the kids left for pairs even. One more kid at the smallest
+// Balleimer, unless that makes kids go twice and one fewer at the largest works.
+function balleimerFix() {
+    const change = (index, delta) => () => {
+        // Not setBucketSize: focusing the number field would open the phone keyboard
+        balleimerSizes[index] += delta;
+        renderBalleimer();
+        settingsChanged();
+        toast(`Balleimer ${index + 1} hat jetzt ${balleimerSizes[index]} ${balleimerSizes[index] === 1 ? 'Kind' : 'Kinder'}`);
+    };
+    if (balleimerSizes.length === 0) {
+        return {
+            label: 'Balleimer mit 1 Kind hinzufügen',
+            run: () => {
+                balleimerSizes.push(1);
+                renderBalleimer();
+                settingsChanged();
+                toast('Balleimer mit 1 Kind hinzugefügt');
+            }
+        };
+    }
+    const label = (index, delta) =>
+        `Balleimer ${index + 1}: ${balleimerSizes[index] + delta} statt ${balleimerSizes[index]} Kinder`;
+    const places = balleimerSizes.reduce((sum, size) => sum + size, 0);
+    const largest = balleimerSizes.indexOf(Math.max(...balleimerSizes));
+    const smallest = balleimerSizes.indexOf(Math.min(...balleimerSizes));
+    const moreCausesRepeats = intValue('numberOfExercises') * (places + 1) > currentPlayers.length;
+    if ((moreCausesRepeats || balleimerSizes[smallest] >= MAX_PER_BALLEIMER) && balleimerSizes[largest] > 1) {
+        return { label: label(largest, -1), run: change(largest, -1) };
+    }
+    if (balleimerSizes[smallest] >= MAX_PER_BALLEIMER) return null;
+    return { label: label(smallest, 1), run: change(smallest, 1) };
+}
+
 function renderBalleimer() {
     const list = $('bucketList');
     list.innerHTML = '';
@@ -434,13 +468,26 @@ function checkStations() {
             + `es sind aber nur ${kids} da.`;
     }
 
-    // Not blocking: more Balleimer places than kids means some kids go twice
+    // Not blocking: warnings about kids without a station, and Balleimer repeats
+    const warnings = [];
+    let fix = null;
+    if (!error && playing % 2 === 1) {
+        warnings.push('1 Kind hat in jeder Übung keinen Partner und keine Station. '
+            + 'Ein Kind mehr oder weniger am Balleimer geht auf.');
+        fix = balleimerFix();
+    }
     const repeats = exercises * atBuckets - kids;
-    warning.hidden = !!error || repeats <= 0;
-    warning.textContent = repeats === 1
-        ? '1 Kind geht zweimal an einen Balleimer.'
-        : `${repeats} Kinder gehen zweimal an einen Balleimer.`;
-    if (repeats > kids) warning.textContent = 'Einige Kinder gehen mehrmals an einen Balleimer.';
+    if (!error && repeats > 0) {
+        warnings.push(repeats > kids
+            ? 'Einige Kinder gehen mehrmals an einen Balleimer.'
+            : `${repeats} ${repeats === 1 ? 'Kind geht' : 'Kinder gehen'} zweimal an einen Balleimer.`);
+    }
+    warning.hidden = warnings.length === 0;
+    warning.innerHTML = warnings.map(escapeHtml).join('<br>');
+    const fixButton = $('stationFix');
+    fixButton.hidden = !fix;
+    fixButton.textContent = fix ? fix.label : '';
+    fixButton.onclick = fix ? fix.run : null;
 
     if (error) {
         summary.className = 'summary is-error';
