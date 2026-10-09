@@ -174,7 +174,8 @@ function render() {
         $('planMeta').textContent = '';
         return;
     }
-    plan.absent = plan.absent || [];
+    plan.players = plan.players.map(withElo);
+    plan.absent = (plan.absent || []).map(withElo);
     plan.exercises.forEach(ex => { ex.mentalTrainer = ex.mentalTrainer || []; });
 
     $('planTitle').textContent = plan.trainingDate ? `Training ${plan.trainingDate}` : 'Trainingsplan';
@@ -270,7 +271,7 @@ function renderEditCard(index) {
         const i = slot++;
         const options = players.map(p =>
             `<option value="${escapeHtml(p.name)}"${p.name === current.name ? ' selected' : ''}>`
-            + `${escapeHtml(p.name)} (${p.klassierung})</option>`).join('');
+            + `${escapeHtml(p.name)} (${p.elo})</option>`).join('');
         return `<select class="control" data-slot="${i}" aria-label="${escapeHtml(label)}">${options}</select>`;
     };
 
@@ -441,6 +442,7 @@ function openAttendance() {
     $('applyFrom').innerHTML = plan.exercises.map((_, i) =>
         `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
     $('applyFrom').value = String(currentIndex + 1);
+    $('lateElo').value = defaultElo(plan.players);
     renderAttendance();
 }
 
@@ -487,10 +489,10 @@ function renderAttendance() {
 
 function addLateKid() {
     const name = $('lateName').value.trim();
-    const klassierung = parseInt($('lateKlassierung').value, 10);
+    const elo = parseInt($('lateElo').value, 10);
     if (!name) return;
-    if (isNaN(klassierung) || klassierung < 1 || klassierung > 21) {
-        toast('Die Klassierung liegt zwischen 1 und 21.');
+    if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) {
+        toast(`Bitte eine Elo zwischen ${ELO_MIN} und ${ELO_MAX} eingeben.`);
         return;
     }
     if (plan.settings.sparringPartners.includes(name)) {
@@ -502,7 +504,7 @@ function addLateKid() {
         attendance.present.add(name);
         toast(`${name} ist wieder dabei`);
     } else {
-        attendance.added.push({ name, klassierung });
+        attendance.added.push({ name, elo });
         attendance.present.add(name);
     }
     $('lateName').value = '';

@@ -623,7 +623,8 @@ h3.field-label {
 
 .level {
     display: inline-block;
-    min-width: 2.25em;
+    /* Fits a four-digit Elo, so all badges line up */
+    min-width: 3.5rem;
     padding: 2px 6px;
     border-radius: 6px;
     background: var(--surface-2);

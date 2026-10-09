@@ -27,7 +27,7 @@ function loadPlayers({ fromSheet = false } = {}) {
     const date = selectedDate();
     const saved = readStored(STORAGE_KEYS.roster);
     if (!fromSheet && saved && saved.date === date && Array.isArray(saved.players)) {
-        setPlayers(saved.players, true);
+        setPlayers(saved.players.map(withElo), true);
         return Promise.resolve();
     }
     if (!date) {
@@ -68,8 +68,8 @@ function refreshFromSheet() {
 
 // ===== PLAYER LIST =====
 function sortPlayers() {
-    currentPlayers.sort((a, b) => sortColumn === 'klassierung'
-        ? b.klassierung - a.klassierung || a.name.localeCompare(b.name)
+    currentPlayers.sort((a, b) => sortColumn === 'elo'
+        ? b.elo - a.elo || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
 }
 
@@ -89,7 +89,7 @@ function renderPlayerList() {
         const item = document.createElement('li');
         item.innerHTML = `
             <span class="name">${escapeHtml(player.name)}</span>
-            <span class="level" title="Klassierung">${player.klassierung}</span>
+            <span class="level" title="Elo">${player.elo}</span>
             <button type="button" class="btn btn-icon btn-quiet" aria-label="${escapeHtml(player.name)} bearbeiten">
                 <i class="bi bi-pencil" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="${escapeHtml(player.name)} entfernen">
@@ -116,7 +116,7 @@ function openPlayerDialog(index) {
     const player = index == null ? null : currentPlayers[index];
     $('playerDialogTitle').textContent = player ? 'Kind bearbeiten' : 'Kind hinzufügen';
     $('playerName').value = player ? player.name : '';
-    $('playerKlassierung').value = player ? player.klassierung : 1;
+    $('playerElo').value = player ? player.elo : defaultElo(currentPlayers);
     $('playerError').hidden = true;
     $('playerDialog').showModal();
     $('playerName').focus();
@@ -125,14 +125,14 @@ function openPlayerDialog(index) {
 function savePlayer(event) {
     event.preventDefault();
     const name = $('playerName').value.trim();
-    const klassierung = parseInt($('playerKlassierung').value, 10);
+    const elo = parseInt($('playerElo').value, 10);
     const error = $('playerError');
 
     let message = null;
     if (!name) {
         message = 'Bitte einen Namen eingeben.';
-    } else if (isNaN(klassierung) || klassierung < 1 || klassierung > 21) {
-        message = 'Die Klassierung liegt zwischen 1 und 21.';
+    } else if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) {
+        message = `Bitte eine Elo zwischen ${ELO_MIN} und ${ELO_MAX} eingeben.`;
     } else {
         const duplicate = currentPlayers.findIndex(p => p.name === name);
         if (duplicate !== -1 && duplicate !== editingPlayerIndex) message = `${name} steht schon in der Liste.`;
@@ -144,9 +144,9 @@ function savePlayer(event) {
     }
 
     if (editingPlayerIndex != null) {
-        currentPlayers[editingPlayerIndex] = { name, klassierung };
+        currentPlayers[editingPlayerIndex] = { name, elo };
     } else {
-        currentPlayers.push({ name, klassierung });
+        currentPlayers.push({ name, elo });
     }
     $('playerDialog').close();
     rosterChanged();
@@ -226,7 +226,7 @@ function renderMentalPicks() {
     const options = currentPlayers.filter(p => !mentalPicks.includes(p.name))
         .sort((a, b) => a.name.localeCompare(b.name));
     select.innerHTML = '<option value="">Kind wählen…</option>' + options.map(p =>
-        `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.klassierung})</option>`).join('');
+        `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.elo})</option>`).join('');
     select.disabled = options.length === 0;
     $('addMentalPick').disabled = options.length === 0;
 
@@ -261,7 +261,7 @@ function renderMentalPicks() {
         item.innerHTML = `
             <span class="pick-pos" aria-hidden="true">${index + 1}</span>
             <span class="pick-text">
-                <span class="name">${escapeHtml(name)}${kid ? ` (${kid.klassierung})` : ''}</span>
+                <span class="name">${escapeHtml(name)}${kid ? ` (${kid.elo})` : ''}</span>
                 <span class="where${off ? ' is-off' : ''}">${escapeHtml(where)}</span>
             </span>
             <button type="button" class="btn btn-icon btn-quiet" aria-label="${escapeHtml(name)} nach vorne"${index === 0 ? ' disabled' : ''}>

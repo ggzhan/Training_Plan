@@ -1,10 +1,12 @@
 package com.example.trainingplanner.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.util.Objects;
 
 public class Player {
     private String name;
-    private int klassierung;
+    private int elo;
 
     public Player() {
     }
@@ -13,9 +15,9 @@ public class Player {
         this.name = name;
     }
 
-    public Player(String name, int klassierung) {
+    public Player(String name, int elo) {
         this.name = name;
-        this.klassierung = klassierung;
+        this.elo = elo;
     }
 
     public String getName() {
@@ -26,12 +28,14 @@ public class Player {
         this.name = name;
     }
 
-    public int getKlassierung() {
-        return klassierung;
+    public int getElo() {
+        return elo;
     }
 
-    public void setKlassierung(int klassierung) {
-        this.klassierung = klassierung;
+    // Plans and lists saved before the sheet switched to Elo call it "klassierung"
+    @JsonAlias("klassierung")
+    public void setElo(int elo) {
+        this.elo = elo;
     }
 
     @Override
@@ -41,19 +45,19 @@ public class Player {
         if (o == null || getClass() != o.getClass())
             return false;
         Player player = (Player) o;
-        return klassierung == player.klassierung && Objects.equals(name, player.name);
+        return elo == player.elo && Objects.equals(name, player.name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, klassierung);
+        return Objects.hash(name, elo);
     }
 
     @Override
     public String toString() {
         return "Player{" +
                 "name='" + name + '\'' +
-                ", klassierung=" + klassierung +
+                ", elo=" + elo +
                 '}';
     }
 }

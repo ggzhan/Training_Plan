@@ -26,7 +26,7 @@ import java.util.Set;
  *
  * The Mentaltrainer works in sessions of one or more consecutive exercises; the
  * same kids stay for the whole session. Kids picked by hand go first, in the
- * order picked; open places go to the strongest kids (highest Klassierung) who
+ * order picked; open places go to the strongest kids (highest Elo) who
  * have not been yet.
  *
  * Rules, strongest first:
@@ -34,15 +34,16 @@ import java.util.Set;
  *   more Balleimer places than kids, fewest visits first);
  * - a kid meets each sparring partner at most once;
  * - two kids play each other at most once, and nobody is without a partner twice;
- * - pairs are as close in Klassierung as possible.
+ * - pairs are as close in Elo as possible.
  * When a rule cannot hold (more exercises than the group allows), the plan still
  * comes out and the bent rule is listed in {@link TrainingPlan#getWarnings()}.
  */
 @Service
 public class TrainingPlanService {
 
-    // Weighs one repeated pair or second sit-out above any Klassierung gap (1-21)
-    private static final int REPEAT_PENALTY = 1000;
+    // Weighs one repeated pair or second sit-out above the Elo gaps of a whole
+    // round (30 kids, gaps up to a few thousand), so a repeat is always the worse choice
+    private static final int REPEAT_PENALTY = 1_000_000;
     // Caps the pairing search so a large group answers in well under a second
     private static final long SEARCH_NODE_BUDGET = 300_000;
 
@@ -160,7 +161,7 @@ public class TrainingPlanService {
                 candidates.removeIf(p -> group.stream().anyMatch(g -> g.getName().equals(p.getName())));
                 Collections.shuffle(candidates, random);
                 candidates.sort(Comparator.comparingInt((Player p) -> visits.getOrDefault(p.getName(), 0))
-                        .thenComparing(Comparator.comparingInt(Player::getKlassierung).reversed()));
+                        .thenComparing(Comparator.comparingInt(Player::getElo).reversed()));
                 for (Player p : candidates.subList(0, Math.min(size - group.size(), candidates.size()))) {
                     if (visits.getOrDefault(p.getName(), 0) > 0) {
                         warnings.add("Übung " + (session * length + 1) + ": " + p.getName()
@@ -170,7 +171,7 @@ public class TrainingPlanService {
                     group.add(p);
                 }
             }
-            group.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
+            group.sort(Comparator.comparingInt(Player::getElo).reversed());
             schedule.add(group);
         }
         return schedule;
@@ -203,7 +204,7 @@ public class TrainingPlanService {
                 }
             }
             // Similar levels share a Balleimer
-            chosen.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
+            chosen.sort(Comparator.comparingInt(Player::getElo).reversed());
             int from = 0;
             for (int size : settings.getBalleimerSizes()) {
                 round.getBalleimer().add(new ArrayList<>(chosen.subList(from, from + size)));
@@ -230,14 +231,14 @@ public class TrainingPlanService {
 
     /**
      * Minimum-cost perfect matching by branch and bound. A pair costs its
-     * Klassierung gap plus REPEAT_PENALTY per earlier meeting; an odd group gets a
+     * Elo gap plus REPEAT_PENALTY per earlier meeting; an odd group gets a
      * bye slot, and taking the bye costs REPEAT_PENALTY per earlier sit-out. The
      * first descent is greedy, so the budget always leaves a good matching.
      */
     private void pairUp(List<Player> pool, History history, ExerciseRound round, List<String> warnings,
             int exerciseNo) {
         List<Player> kids = new ArrayList<>(pool);
-        kids.sort(Comparator.comparingInt(Player::getKlassierung).reversed());
+        kids.sort(Comparator.comparingInt(Player::getElo).reversed());
         boolean odd = kids.size() % 2 == 1;
         int n = kids.size() + (odd ? 1 : 0);
         int bye = odd ? n - 1 : -1;
@@ -259,7 +260,7 @@ public class TrainingPlanService {
                 } else {
                     Player a = kids.get(i);
                     Player b = kids.get(j);
-                    cost[i][j] = Math.abs(a.getKlassierung() - b.getKlassierung())
+                    cost[i][j] = Math.abs(a.getElo() - b.getElo())
                             + REPEAT_PENALTY * history.meetings(a, b);
                 }
                 minCost[i] = Math.min(minCost[i], cost[i][j]);

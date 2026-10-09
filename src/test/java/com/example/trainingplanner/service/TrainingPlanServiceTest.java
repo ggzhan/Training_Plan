@@ -130,7 +130,7 @@ class TrainingPlanServiceTest {
                 new Player("D", 12), new Player("E", 6), new Player("F", 6));
         TrainingPlan plan = generate(1, new ArrayList<>(players), settings(1, 0, 2));
         for (PlayerPair pair : plan.getExercises().get(0).getPairs()) {
-            assertEquals(pair.getPlayer1().getKlassierung(), pair.getPlayer2().getKlassierung());
+            assertEquals(pair.getPlayer1().getElo(), pair.getPlayer2().getElo());
         }
     }
 
@@ -248,7 +248,7 @@ class TrainingPlanServiceTest {
     }
 
     private static List<Player> rankedKids(int n) {
-        // Kind 0 is strongest (Klassierung n), Kind n-1 weakest (1)
+        // Kind 0 is strongest (Elo n), Kind n-1 weakest (1)
         List<Player> players = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             players.add(new Player("Kind " + i, n - i));
@@ -335,5 +335,24 @@ class TrainingPlanServiceTest {
 
         assertEquals(List.of("Kind 6"), mentalNames(adjusted.getExercises().get(1)));
         assertEquals(List.of("Kind 0"), mentalNames(adjusted.getExercises().get(2)));
+    }
+
+    @Test
+    void aLargeEloGapIsStillBetterThanARepeatedPair() {
+        // Two strong and two weak kids, 1400 Elo apart: the second exercise has to mix them
+        List<Player> players = new ArrayList<>(List.of(new Player("A", 600), new Player("B", 610),
+                new Player("C", 2000), new Player("D", 2010)));
+        TrainingPlan plan = generate(1, players, settings(2, 0, 2));
+        Set<String> pairs = new HashSet<>();
+        plan.getExercises().forEach(round ->
+                round.getPairs().forEach(p -> assertTrue(pairs.add(pairKey(p)), pairKey(p) + " repeats")));
+        assertTrue(plan.getWarnings().isEmpty(), plan.getWarnings().toString());
+    }
+
+    @Test
+    void playersSavedWithTheOldKlassierungFieldStillReadTheirValue() throws Exception {
+        Player player = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue("{\"name\":\"Alt\",\"klassierung\":812}", Player.class);
+        assertEquals(812, player.getElo());
     }
 }

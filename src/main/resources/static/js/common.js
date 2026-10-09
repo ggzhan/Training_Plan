@@ -6,6 +6,21 @@ const STORAGE_KEYS = {
     plan: 'trainingsplaner.plan'
 };
 
+// Lists and plans saved before the sheet switched to Elo call the value "klassierung"
+function withElo(player) {
+    const { klassierung, ...rest } = player;
+    return { ...rest, elo: player.elo ?? klassierung ?? 0 };
+}
+
+// Default for a kid added by hand: the lowest Elo today, since new kids are usually beginners
+function defaultElo(players) {
+    const values = players.map(p => p.elo).filter(v => v > 0);
+    return values.length > 0 ? Math.min(...values) : 700;
+}
+
+const ELO_MIN = 1;
+const ELO_MAX = 3000;
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text == null ? '' : String(text);
