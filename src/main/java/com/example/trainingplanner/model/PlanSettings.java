@@ -15,6 +15,12 @@ public class PlanSettings {
     private int mentalTrainerLength = 1;
     // Kids chosen by hand, in the order they fill the Mentaltrainer sessions
     private List<String> mentalTrainerPicks = new ArrayList<>();
+    // Kids who only ever go to a Balleimer or a sparring partner, never into a pair
+    private List<String> onlyStationKids = new ArrayList<>();
+    // Every kid gets at least one Balleimer or sparring turn per training
+    private boolean everyoneAtStation;
+    // Pairs of kids who must not play each other (sharing a Balleimer is fine)
+    private List<List<String>> neverTogether = new ArrayList<>();
 
     // Plans saved before per-Balleimer sizes had one count and one size for all
     private int legacyBalleimerCount;
@@ -94,6 +100,30 @@ public class PlanSettings {
 
     public void setMentalTrainerPicks(List<String> mentalTrainerPicks) {
         this.mentalTrainerPicks = mentalTrainerPicks;
+    }
+
+    public List<String> getOnlyStationKids() {
+        return onlyStationKids;
+    }
+
+    public void setOnlyStationKids(List<String> onlyStationKids) {
+        this.onlyStationKids = onlyStationKids;
+    }
+
+    public boolean isEveryoneAtStation() {
+        return everyoneAtStation;
+    }
+
+    public void setEveryoneAtStation(boolean everyoneAtStation) {
+        this.everyoneAtStation = everyoneAtStation;
+    }
+
+    public List<List<String>> getNeverTogether() {
+        return neverTogether;
+    }
+
+    public void setNeverTogether(List<List<String>> neverTogether) {
+        this.neverTogether = neverTogether;
     }
 
     public int balleimerSlots() {

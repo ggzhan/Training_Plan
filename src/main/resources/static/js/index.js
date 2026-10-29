@@ -4,6 +4,9 @@ let currentPlayers = [];
 let sparringPartners = [];
 let balleimerSizes = []; // kids per Balleimer, one entry per Balleimer
 let mentalPicks = []; // kid names chosen for the Mentaltrainer, in order
+let onlyStationKids = []; // names who only ever go to a Balleimer or sparring
+let neverTogether = []; // [name, name] pairs who must not play each other
+let everyoneAtStation = false;
 const MAX_BALLEIMER = 6;
 const MAX_PER_BALLEIMER = 8;
 let editingPlayerIndex = null;
@@ -77,6 +80,7 @@ function renderPlayerList() {
     sortPlayers();
     $('playerCount').textContent = currentPlayers.length;
     $('rosterNote').hidden = !rosterEdited;
+    $('resetRoster').hidden = !rosterEdited;
     document.querySelectorAll('.sortbar [data-sort]').forEach(btn =>
         btn.setAttribute('aria-pressed', String(btn.dataset.sort === sortColumn)));
 
@@ -88,7 +92,8 @@ function renderPlayerList() {
     currentPlayers.forEach((player, index) => {
         const item = document.createElement('li');
         item.innerHTML = `
-            <span class="name">${escapeHtml(player.name)}</span>
+            <span class="name">${escapeHtml(player.name)}${onlyStationKids.includes(player.name)
+                ? ' <i class="bi bi-signpost-split only-mark" role="img" aria-label="nur Balleimer oder Sparring" title="Nur Balleimer / Sparring"></i>' : ''}</span>
             <span class="level" title="Elo">${player.elo}</span>
             <button type="button" class="btn btn-icon btn-quiet" aria-label="${escapeHtml(player.name)} bearbeiten">
                 <i class="bi bi-pencil" aria-hidden="true"></i></button>
@@ -100,15 +105,14 @@ function renderPlayerList() {
         list.appendChild(item);
     });
 
+    renderRules();
     checkStations();
 }
 
 function togglePlayerList() {
     const list = $('playerList');
-    const button = $('togglePlayers');
     list.hidden = !list.hidden;
-    button.setAttribute('aria-expanded', String(!list.hidden));
-    button.textContent = list.hidden ? 'Liste zeigen' : 'Liste ausblenden';
+    $('togglePlayers').setAttribute('aria-expanded', String(!list.hidden));
 }
 
 function openPlayerDialog(index) {
@@ -117,6 +121,7 @@ function openPlayerDialog(index) {
     $('playerDialogTitle').textContent = player ? 'Kind bearbeiten' : 'Kind hinzufügen';
     $('playerName').value = player ? player.name : '';
     $('playerElo').value = player ? player.elo : defaultElo(currentPlayers);
+    $('playerOnlyStation').checked = !!player && onlyStationKids.includes(player.name);
     $('playerError').hidden = true;
     $('playerDialog').showModal();
     $('playerName').focus();
@@ -144,12 +149,25 @@ function savePlayer(event) {
     }
 
     if (editingPlayerIndex != null) {
+        renameEverywhere(currentPlayers[editingPlayerIndex].name, name);
         currentPlayers[editingPlayerIndex] = { name, elo };
     } else {
         currentPlayers.push({ name, elo });
     }
+    onlyStationKids = onlyStationKids.filter(n => n !== name);
+    if ($('playerOnlyStation').checked) onlyStationKids.push(name);
     $('playerDialog').close();
+    writeStored(STORAGE_KEYS.settings, currentSettings());
     rosterChanged();
+}
+
+// Rules refer to kids by name, so a renamed kid keeps them
+function renameEverywhere(oldName, newName) {
+    if (oldName === newName) return;
+    const swap = n => (n === oldName ? newName : n);
+    onlyStationKids = onlyStationKids.map(swap);
+    mentalPicks = mentalPicks.map(swap);
+    neverTogether = neverTogether.map(pair => pair.map(swap));
 }
 
 function deletePlayer(index) {
@@ -179,6 +197,10 @@ function loadSettings() {
     }
     if (Array.isArray(saved.sparringPartners)) sparringPartners = saved.sparringPartners;
     if (Array.isArray(saved.mentalTrainerPicks)) mentalPicks = saved.mentalTrainerPicks;
+    if (Array.isArray(saved.onlyStationKids)) onlyStationKids = saved.onlyStationKids;
+    if (Array.isArray(saved.neverTogether)) neverTogether = saved.neverTogether;
+    everyoneAtStation = saved.everyoneAtStation === true;
+    $('everyoneAtStation').checked = everyoneAtStation;
 }
 
 function currentSettings() {
@@ -188,7 +210,10 @@ function currentSettings() {
         mentalTrainerKids: intValue('mentalTrainerKids'),
         mentalTrainerLength: Math.max(1, intValue('mentalTrainerLength')),
         mentalTrainerPicks: mentalPicks,
-        sparringPartners
+        sparringPartners,
+        onlyStationKids,
+        everyoneAtStation,
+        neverTogether
     };
 }
 
@@ -225,7 +250,7 @@ function renderMentalPicks() {
     const select = $('mentalPickSelect');
     const options = currentPlayers.filter(p => !mentalPicks.includes(p.name))
         .sort((a, b) => a.name.localeCompare(b.name));
-    select.innerHTML = '<option value="">Kind wählen…</option>' + options.map(p =>
+    select.innerHTML = '<option value="">Kind…</option>' + options.map(p =>
         `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.elo})</option>`).join('');
     select.disabled = options.length === 0;
     $('addMentalPick').disabled = options.length === 0;
@@ -239,22 +264,22 @@ function renderMentalPicks() {
         let where;
         let off = false;
         if (!kid) {
-            where = 'Heute nicht angemeldet';
+            where = 'Heute nicht da';
             off = true;
         } else if (perSession === 0) {
-            where = 'Kinder pro Einheit ist 0';
+            where = 'Mentaltrainer aus';
             off = true;
         } else {
             const session = Math.floor(order / perSession);
             order++;
             if (session >= sessions) {
-                where = 'Kommt nicht dran – zu wenig Plätze';
+                where = 'Kein Platz mehr';
                 off = true;
                 notPlaced++;
             } else {
                 const first = session * length + 1;
                 const last = Math.min(first + length - 1, exercises);
-                where = `Einheit ${session + 1} · ${first === last ? `Übung ${first}` : `Übung ${first}–${last}`}`;
+                where = first === last ? `Übung ${first}` : `Übung ${first}–${last}`;
             }
         }
         const item = document.createElement('li');
@@ -276,8 +301,7 @@ function renderMentalPicks() {
 
     const note = $('mentalPickNote');
     note.hidden = notPlaced === 0;
-    note.textContent = `${notPlaced} ${notPlaced === 1 ? 'Kind kommt' : 'Kinder kommen'} nicht dran: `
-        + `${sessions} ${sessions === 1 ? 'Einheit' : 'Einheiten'} × ${perSession} Kinder.`;
+    note.textContent = `${notPlaced} ohne Platz (${sessions} × ${perSession} Plätze)`;
 }
 
 function addMentalPick() {
@@ -344,21 +368,17 @@ function balleimerFix() {
 function renderBalleimer() {
     const list = $('bucketList');
     list.innerHTML = '';
-    if (balleimerSizes.length === 0) {
-        list.innerHTML = '<li class="empty">Keine Balleimer – alle Kinder spielen in Paaren oder Sparring.</li>';
-    }
     balleimerSizes.forEach((size, index) => {
         const n = index + 1;
         const item = document.createElement('li');
         item.innerHTML = `
-            <label for="bucket-${n}">Balleimer ${n}</label>
+            <label for="bucket-${n}"><span class="bucket-no">${n}</span> <span class="visually-hidden">Balleimer ${n},</span>
+                <i class="bi bi-people" aria-hidden="true"></i><span class="visually-hidden">Kinder</span></label>
             <div class="stepper">
                 <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind weniger"${size <= 1 ? ' disabled' : ''}>−</button>
-                <input type="number" id="bucket-${n}" inputmode="numeric" min="1" max="${MAX_PER_BALLEIMER}" value="${size}"
-                    aria-describedby="bucket-${n}-unit">
+                <input type="number" id="bucket-${n}" inputmode="numeric" min="1" max="${MAX_PER_BALLEIMER}" value="${size}">
                 <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind mehr"${size >= MAX_PER_BALLEIMER ? ' disabled' : ''}>+</button>
             </div>
-            <span id="bucket-${n}-unit" class="visually-hidden">Kinder</span>
             <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="Balleimer ${n} entfernen">
                 <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
         const [minus, plus, remove] = item.querySelectorAll('button');
@@ -437,71 +457,171 @@ function renderSparringPartners() {
     });
 }
 
+// ===== RULES =====
+const RULES_OPEN_KEY = 'trainingsplaner.rulesOpen';
+
+function kidOptions(exclude) {
+    return currentPlayers.filter(p => !exclude.includes(p.name))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+}
+
+function renderRules() {
+    const here = new Set(currentPlayers.map(p => p.name));
+
+    const chips = $('onlyStationList');
+    chips.innerHTML = '';
+    onlyStationKids.forEach((name, index) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip' + (here.has(name) ? '' : ' is-away');
+        chip.innerHTML = `<span>${escapeHtml(name)}</span>
+            <button type="button" class="btn" aria-label="${escapeHtml(name)} entfernen">
+                <i class="bi bi-x-lg" aria-hidden="true"></i></button>`;
+        chip.querySelector('button').addEventListener('click', () => {
+            onlyStationKids.splice(index, 1);
+            rulesChanged();
+        });
+        chips.appendChild(chip);
+    });
+    $('onlyStationSelect').innerHTML = '<option value="">Kind…</option>' + kidOptions(onlyStationKids);
+
+    const list = $('neverList');
+    list.innerHTML = '';
+    neverTogether.forEach((pair, index) => {
+        const item = document.createElement('li');
+        const away = pair.some(n => !here.has(n));
+        item.className = away ? 'is-away' : '';
+        item.innerHTML = `<span>${escapeHtml(pair[0])}</span><i class="bi bi-x-lg never-x" aria-hidden="true"></i>
+            <span>${escapeHtml(pair[1])}</span>
+            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet"
+                aria-label="${escapeHtml(pair[0])} und ${escapeHtml(pair[1])}: Regel entfernen">
+                <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
+        item.querySelector('button').addEventListener('click', () => {
+            neverTogether.splice(index, 1);
+            rulesChanged();
+        });
+        list.appendChild(item);
+    });
+    const options = '<option value="">Kind…</option>' + kidOptions([]);
+    const a = $('neverA').value;
+    const b = $('neverB').value;
+    $('neverA').innerHTML = options;
+    $('neverB').innerHTML = options;
+    $('neverA').value = here.has(a) ? a : '';
+    $('neverB').value = here.has(b) ? b : '';
+
+    const count = (everyoneAtStation ? 1 : 0)
+        + onlyStationKids.filter(n => here.has(n)).length
+        + neverTogether.filter(pair => pair.every(n => here.has(n))).length;
+    $('rulesSummary').textContent = count === 0 ? 'Keine' : `${count} aktiv`;
+}
+
+function rulesChanged() {
+    renderRules();
+    renderPlayerList();
+    settingsChanged();
+}
+
+function addOnlyStation() {
+    const name = $('onlyStationSelect').value;
+    if (!name || onlyStationKids.includes(name)) return;
+    onlyStationKids.push(name);
+    rulesChanged();
+}
+
+function addNeverTogether() {
+    const a = $('neverA').value;
+    const b = $('neverB').value;
+    if (!a || !b) return;
+    if (a === b) {
+        toast('Zwei verschiedene Kinder wählen');
+        return;
+    }
+    const key = [a, b].sort().join('\u0000');
+    if (neverTogether.some(pair => [...pair].sort().join('\u0000') === key)) {
+        toast('Diese Regel gibt es schon');
+        return;
+    }
+    neverTogether.push([a, b]);
+    $('neverA').value = '';
+    $('neverB').value = '';
+    rulesChanged();
+}
+
+function setOpen(buttonId, bodyId, open) {
+    $(bodyId).hidden = !open;
+    $(buttonId).setAttribute('aria-expanded', String(open));
+}
+
 // ===== FEASIBILITY =====
-// Mirrors the server's checks; when the settings cannot work, says why and offers the fix
-function checkStations() {
-    const summary = $('stationSummary');
-    const warning = $('stationWarning');
+function stat(icon, value, label, extraClass = '') {
+    return `<span class="stat ${extraClass}" title="${escapeHtml(label)}"><i class="bi ${icon}" aria-hidden="true"></i>`
+        + ` ${escapeHtml(String(value))}<span class="visually-hidden"> ${escapeHtml(label)}</span></span>`;
+}
+
+// Mirrors the server's checks: errors block, warnings only inform
+function stationNumbers() {
     const kids = currentPlayers.length;
-    const exercises = intValue('numberOfExercises');
     const atBuckets = balleimerSizes.reduce((sum, size) => sum + size, 0);
     const sparring = sparringPartners.length;
     const mental = intValue('mentalTrainerKids');
-    const playing = kids - atBuckets - sparring - mental;
+    return { kids, atBuckets, sparring, mental, playing: kids - atBuckets - sparring - mental };
+}
+
+function checkStations() {
+    const summary = $('stationSummary');
+    const warning = $('stationWarning');
+    const { kids, atBuckets, sparring, mental, playing } = stationNumbers();
+    const exercises = intValue('numberOfExercises');
     const kidNames = new Set(currentPlayers.map(p => p.name));
     const clash = sparringPartners.find(name => kidNames.has(name));
     const length = Math.max(1, intValue('mentalTrainerLength'));
     const picked = mentalPicks.filter(name => kidNames.has(name)).length;
     $('mentalSummary').textContent = mental === 0
         ? 'Aus'
-        : `${mental} ${mental === 1 ? 'Kind' : 'Kinder'} · ${length} ${length === 1 ? 'Übung' : 'Übungen'}`
-            + (picked > 0 ? ` · ${picked} ausgewählt` : '');
+        : `${mental} Kinder · ${length}×` + (picked > 0 ? ` · ${picked} gewählt` : '');
     renderMentalPicks();
 
     let error = null;
     if (kids === 0) {
         error = 'Für dieses Datum ist niemand angemeldet.';
     } else if (clash) {
-        error = `${clash} steht bei den Kindern und bei den Sparringpartnern. Bitte nur an einer Stelle eintragen.`;
+        error = `${clash} ist Kind und Sparringpartner. Bitte nur einmal eintragen.`;
     } else if (playing < 0) {
-        error = `Mentaltrainer, Balleimer und Sparring brauchen ${kids - playing} Kinder pro Übung, `
-            + `es sind aber nur ${kids} da.`;
+        error = `Zu viele Plätze: ${kids - playing} pro Übung, aber nur ${kids} Kinder.`;
     }
 
-    // Not blocking: warnings about kids without a station, and Balleimer repeats
     const warnings = [];
-    let fix = null;
-    if (!error && playing % 2 === 1) {
-        warnings.push('1 Kind hat in jeder Übung keinen Partner und keine Station. '
-            + 'Ein Kind mehr oder weniger am Balleimer geht auf.');
-        fix = balleimerFix();
-    }
-    const repeats = exercises * atBuckets - kids;
-    if (!error && repeats > 0) {
-        warnings.push(repeats > kids
-            ? 'Einige Kinder gehen mehrmals an einen Balleimer.'
-            : `${repeats} ${repeats === 1 ? 'Kind geht' : 'Kinder gehen'} zweimal an einen Balleimer.`);
+    if (!error) {
+        const stationOnly = onlyStationKids.filter(n => kidNames.has(n)).length;
+        if (stationOnly > atBuckets + sparring) {
+            warnings.push(`Nur-Station-Kinder: ${stationOnly}, aber nur ${atBuckets + sparring} Plätze pro Übung.`);
+        }
+        const repeats = exercises * atBuckets - kids;
+        if (repeats > 0) {
+            warnings.push(repeats > kids ? 'Einige Kinder 2× am Balleimer.' : `${repeats} Kinder 2× am Balleimer.`);
+        }
+        if (everyoneAtStation) {
+            const places = exercises * (atBuckets + sparring) - exercises * stationOnly;
+            const need = kids - stationOnly;
+            if (places < need) warnings.push(`Nicht alle kommen an eine Station: ${places} Plätze für ${need} Kinder.`);
+        }
     }
     warning.hidden = warnings.length === 0;
-    warning.innerHTML = warnings.map(escapeHtml).join('<br>');
-    const fixButton = $('stationFix');
-    fixButton.hidden = !fix;
-    fixButton.textContent = fix ? fix.label : '';
-    fixButton.onclick = fix ? fix.run : null;
+    warning.innerHTML = warnings.map(w => `<i class="bi bi-exclamation-circle" aria-hidden="true"></i> ${escapeHtml(w)}`).join('<br>');
 
     if (error) {
-        summary.className = 'summary is-error';
+        summary.className = 'stats is-error';
         summary.textContent = error;
     } else {
-        const parts = [];
         const pairs = Math.floor(playing / 2);
-        parts.push(`${pairs} ${pairs === 1 ? 'Paar' : 'Paare'}`);
-        if (mental > 0) parts.push(`${mental} beim Mentaltrainer`);
-        if (atBuckets > 0) parts.push(`${atBuckets} am Balleimer`);
-        if (sparring > 0) parts.push(`${sparring} im Sparring`);
-        if (playing % 2 === 1) parts.push('1 ohne Partner');
-        summary.className = 'summary';
-        summary.textContent = `${kids} Kinder · pro Übung: ${parts.join(' · ')}`;
+        let html = stat('bi-people', kids, 'Kinder') + stat('bi-arrow-left-right', pairs, pairs === 1 ? 'Paar' : 'Paare');
+        if (atBuckets > 0) html += stat('bi-basket', atBuckets, 'am Balleimer', 'is-bucket');
+        if (sparring > 0) html += stat('bi-person-badge', sparring, 'im Sparring', 'is-sparring');
+        if (mental > 0) html += stat('bi-lightbulb', mental, 'beim Mentaltrainer', 'is-mental');
+        if (playing % 2 === 1) html += stat('bi-exclamation-triangle-fill', 1, 'ohne Partner', 'is-warn');
+        summary.className = 'stats';
+        summary.innerHTML = html;
     }
     $('generateBtn').disabled = !!error;
 }
@@ -516,8 +636,35 @@ function showFormError(message) {
 
 function generatePlan(event) {
     event.preventDefault();
+    if ($('generateBtn').disabled) return;
+    if (stationNumbers().playing % 2 === 1) {
+        openOddDialog();
+        return;
+    }
+    createPlan();
+}
+
+// An odd number left for pairs leaves one kid alone: ask before creating
+function openOddDialog() {
+    const { playing } = stationNumbers();
+    const fix = balleimerFix();
+    $('oddText').textContent = `In jeder Übung spielen ${playing - 1} Kinder in Paaren, 1 Kind bleibt allein.`;
+    const fixButton = $('oddFix');
+    fixButton.hidden = !fix;
+    if (fix) {
+        fixButton.innerHTML = `<i class="bi bi-basket" aria-hidden="true"></i> ${escapeHtml(fix.label)} – dann erstellen`;
+        fixButton.onclick = () => {
+            $('oddDialog').close();
+            fix.run();
+            createPlan();
+        };
+    }
+    $('oddDialog').showModal();
+    (fix ? fixButton : $('oddAnyway')).focus();
+}
+
+function createPlan() {
     const button = $('generateBtn');
-    if (button.disabled) return;
     $('formError').hidden = true;
     button.disabled = true;
     button.textContent = 'Plan wird erstellt…';
@@ -566,6 +713,32 @@ document.addEventListener('DOMContentLoaded', () => {
     ['numberOfExercises', 'mentalTrainerKids', 'mentalTrainerLength'].forEach(id =>
         $(id).addEventListener('input', settingsChanged));
     $('addBucketBtn').addEventListener('click', addBucket);
+
+    setOpen('toggleRules', 'rulesBody', readStored(RULES_OPEN_KEY) === true);
+    $('toggleRules').addEventListener('click', () => {
+        const open = $('toggleRules').getAttribute('aria-expanded') !== 'true';
+        setOpen('toggleRules', 'rulesBody', open);
+        writeStored(RULES_OPEN_KEY, open);
+    });
+    $('everyoneAtStation').addEventListener('change', (e) => {
+        everyoneAtStation = e.target.checked;
+        rulesChanged();
+    });
+    $('addOnlyStation').addEventListener('click', addOnlyStation);
+    $('addNever').addEventListener('click', addNeverTogether);
+
+    // ⓘ buttons show or hide the short explanation next to them
+    document.querySelectorAll('.info-btn').forEach(btn => btn.addEventListener('click', () => {
+        const info = $(btn.getAttribute('aria-controls'));
+        info.hidden = !info.hidden;
+        btn.setAttribute('aria-expanded', String(!info.hidden));
+    }));
+
+    $('oddAnyway').addEventListener('click', () => {
+        $('oddDialog').close();
+        createPlan();
+    });
+    $('closeOdd').addEventListener('click', () => $('oddDialog').close());
 
     $('addSparringBtn').addEventListener('click', addSparringPartner);
     // Enter in the name field adds the partner instead of submitting the form

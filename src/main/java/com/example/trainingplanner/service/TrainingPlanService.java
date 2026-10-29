@@ -29,7 +29,11 @@ import java.util.Set;
  * order picked; open places go to the strongest kids (highest Elo) who
  * have not been yet.
  *
+ * Kids marked "only stations" go to a Balleimer or a sparring partner in every
+ * exercise and never into a pair or to the Mentaltrainer.
+ *
  * Rules, strongest first:
+ * - two kids marked "never together" do not play each other;
  * - a kid goes to a Balleimer at most once per session (more only when there are
  *   more Balleimer places than kids, fewest visits first);
  * - a kid meets each sparring partner at most once;
@@ -44,6 +48,8 @@ public class TrainingPlanService {
     // Weighs one repeated pair or second sit-out above the Elo gaps of a whole
     // round (30 kids, gaps up to a few thousand), so a repeat is always the worse choice
     private static final int REPEAT_PENALTY = 1_000_000;
+    // Above any number of repeats, so "never together" is only broken when nothing else fits
+    private static final int NEVER_TOGETHER_PENALTY = 50_000_000;
     // Caps the pairing search so a large group answers in well under a second
     private static final long SEARCH_NODE_BUDGET = 300_000;
 
@@ -90,6 +96,14 @@ public class TrainingPlanService {
             history.record(round);
             exercises.add(round);
         }
+        if (settings.isEveryoneAtStation()) {
+            Set<String> stationOnly = new HashSet<>(settings.getOnlyStationKids());
+            for (Player p : players) {
+                if (!stationOnly.contains(p.getName()) && history.stationCount(p) == 0) {
+                    warnings.add(p.getName() + " war nie an einem Balleimer oder im Sparring.");
+                }
+            }
+        }
 
         TrainingPlan plan = new TrainingPlan();
         plan.setTrainingDate(trainingDate);
@@ -116,6 +130,8 @@ public class TrainingPlanService {
         int sessions = (settings.getNumberOfExercises() + length - 1) / length;
         Set<String> present = new HashSet<>();
         players.forEach(p -> present.add(p.getName()));
+        // Station-only kids never go to the Mentaltrainer
+        Set<String> stationOnly = new HashSet<>(settings.getOnlyStationKids());
 
         // Sessions each kid already had, and the group of a session cut by keepThrough
         Map<String, Integer> visits = new HashMap<>();
@@ -133,7 +149,7 @@ public class TrainingPlanService {
         // Picks still present who have not had a session, in the order picked
         List<Player> picks = new ArrayList<>();
         for (String name : settings.getMentalTrainerPicks()) {
-            if (present.contains(name) && visits.getOrDefault(name, 0) == 0
+            if (present.contains(name) && !stationOnly.contains(name) && visits.getOrDefault(name, 0) == 0
                     && picks.stream().noneMatch(p -> p.getName().equals(name))) {
                 picks.add(findByName(players, name));
             }
@@ -158,7 +174,8 @@ public class TrainingPlanService {
             }
             if (group.size() < size) {
                 List<Player> candidates = new ArrayList<>(players);
-                candidates.removeIf(p -> group.stream().anyMatch(g -> g.getName().equals(p.getName())));
+                candidates.removeIf(p -> stationOnly.contains(p.getName())
+                        || group.stream().anyMatch(g -> g.getName().equals(p.getName())));
                 Collections.shuffle(candidates, random);
                 candidates.sort(Comparator.comparingInt((Player p) -> visits.getOrDefault(p.getName(), 0))
                         .thenComparing(Comparator.comparingInt(Player::getElo).reversed()));
@@ -192,40 +209,78 @@ public class TrainingPlanService {
         round.setMentalTrainer(new ArrayList<>(mentalTrainer));
         pool.removeIf(p -> mentalTrainer.stream().anyMatch(m -> m.getName().equals(p.getName())));
 
-        // 1. Balleimer: kids who have not been at one yet
+        // 1. Station-only kids first: Balleimer or sparring, whichever they had less
+        Set<String> stationOnlyNames = new HashSet<>(settings.getOnlyStationKids());
+        List<Player> stationOnly = new ArrayList<>(pool);
+        stationOnly.removeIf(p -> !stationOnlyNames.contains(p.getName()));
+        pool.removeAll(stationOnly);
         int slots = settings.balleimerSlots();
-        if (slots > 0) {
-            pool.sort(Comparator.comparingInt(p -> history.balleimer(p)));
-            List<Player> chosen = new ArrayList<>(pool.subList(0, slots));
-            pool.removeAll(chosen);
-            for (Player p : chosen) {
-                if (history.balleimer(p) > 0) {
-                    warnings.add("Übung " + exerciseNo + ": " + p.getName() + " ist zum zweiten Mal am Balleimer.");
-                }
+        List<Player> atBuckets = new ArrayList<>();
+        Map<String, Player> sparring = new HashMap<>();
+        List<String> freePartners = new ArrayList<>(settings.getSparringPartners());
+        stationOnly.sort(Comparator.comparingInt(history::stationCount));
+        for (Player kid : stationOnly) {
+            boolean preferSparring = !freePartners.isEmpty()
+                    && (atBuckets.size() >= slots || history.sparringCount(kid) < history.balleimer(kid));
+            if (preferSparring) {
+                String partner = freePartners.stream().filter(pt -> !history.sparredWith(pt, kid)).findFirst()
+                        .orElse(freePartners.get(0));
+                freePartners.remove(partner);
+                sparring.put(partner, kid);
+            } else if (atBuckets.size() < slots) {
+                atBuckets.add(kid);
+            } else {
+                warnings.add("Übung " + exerciseNo + ": Für " + kid.getName()
+                        + " ist kein Balleimer- oder Sparringplatz frei, spielt im Paar.");
+                pool.add(kid);
             }
+        }
+
+        // 2. Balleimer: kids who have not been at one yet (or, with "everyone once",
+        //    at no station yet)
+        Comparator<Player> bucketOrder = Comparator.comparingInt(history::balleimer);
+        if (settings.isEveryoneAtStation()) {
+            bucketOrder = Comparator.comparingInt(history::stationCount).thenComparing(bucketOrder);
+        }
+        pool.sort(bucketOrder);
+        List<Player> chosen = new ArrayList<>(pool.subList(0, Math.min(slots - atBuckets.size(), pool.size())));
+        pool.removeAll(chosen);
+        for (Player p : chosen) {
+            if (history.balleimer(p) > 0) {
+                warnings.add("Übung " + exerciseNo + ": " + p.getName() + " ist zum zweiten Mal am Balleimer.");
+            }
+        }
+        atBuckets.addAll(chosen);
+        if (slots > 0) {
             // Similar levels share a Balleimer
-            chosen.sort(Comparator.comparingInt(Player::getElo).reversed());
+            atBuckets.sort(Comparator.comparingInt(Player::getElo).reversed());
             int from = 0;
             for (int size : settings.getBalleimerSizes()) {
-                round.getBalleimer().add(new ArrayList<>(chosen.subList(from, from + size)));
+                int to = Math.min(from + size, atBuckets.size());
+                round.getBalleimer().add(new ArrayList<>(atBuckets.subList(Math.min(from, to), to)));
                 from += size;
             }
         }
 
-        // 2. Sparring: a kid this partner has not had yet, spreading sparring across kids
-        for (String partner : settings.getSparringPartners()) {
-            Player kid = Collections.min(pool, Comparator
-                    .comparingInt((Player p) -> history.sparredWith(partner, p) ? 1 : 0)
-                    .thenComparingInt(history::sparringCount));
+        // 3. Sparring: a kid this partner has not had yet, spreading sparring across kids
+        for (String partner : freePartners) {
+            Comparator<Player> order = Comparator.comparingInt((Player p) -> history.sparredWith(partner, p) ? 1 : 0);
+            if (settings.isEveryoneAtStation()) {
+                order = order.thenComparingInt(history::stationCount);
+            }
+            Player kid = Collections.min(pool, order.thenComparingInt(history::sparringCount));
             if (history.sparredWith(partner, kid)) {
                 warnings.add("Übung " + exerciseNo + ": " + kid.getName() + " spielt zum zweiten Mal mit " + partner + ".");
             }
             pool.remove(kid);
-            round.getSparring().add(new SparringAssignment(partner, kid));
+            sparring.put(partner, kid);
+        }
+        for (String partner : settings.getSparringPartners()) {
+            round.getSparring().add(new SparringAssignment(partner, sparring.get(partner)));
         }
 
-        // 3. Everyone else plays in pairs
-        pairUp(pool, history, round, warnings, exerciseNo);
+        // 4. Everyone else plays in pairs
+        pairUp(pool, history, round, warnings, exerciseNo, neverTogetherKeys(settings));
         return round;
     }
 
@@ -236,7 +291,7 @@ public class TrainingPlanService {
      * first descent is greedy, so the budget always leaves a good matching.
      */
     private void pairUp(List<Player> pool, History history, ExerciseRound round, List<String> warnings,
-            int exerciseNo) {
+            int exerciseNo, Set<String> neverTogether) {
         List<Player> kids = new ArrayList<>(pool);
         kids.sort(Comparator.comparingInt(Player::getElo).reversed());
         boolean odd = kids.size() % 2 == 1;
@@ -261,7 +316,8 @@ public class TrainingPlanService {
                     Player a = kids.get(i);
                     Player b = kids.get(j);
                     cost[i][j] = Math.abs(a.getElo() - b.getElo())
-                            + REPEAT_PENALTY * history.meetings(a, b);
+                            + REPEAT_PENALTY * history.meetings(a, b)
+                            + (neverTogether.contains(History.pairKey(a, b)) ? NEVER_TOGETHER_PENALTY : 0);
                 }
                 minCost[i] = Math.min(minCost[i], cost[i][j]);
             }
@@ -293,7 +349,10 @@ public class TrainingPlanService {
             } else {
                 Player a = kids.get(i);
                 Player b = kids.get(j);
-                if (history.meetings(a, b) > 0) {
+                if (neverTogether.contains(History.pairKey(a, b))) {
+                    warnings.add("Übung " + exerciseNo + ": " + a.getName() + " & " + b.getName()
+                            + " sollten nie zusammen spielen, es ging nicht anders.");
+                } else if (history.meetings(a, b) > 0) {
                     warnings.add("Übung " + exerciseNo + ": " + a.getName() + " & " + b.getName() + " spielen zum zweiten Mal zusammen.");
                 }
                 round.getPairs().add(new PlayerPair(a, b));
@@ -357,6 +416,14 @@ public class TrainingPlanService {
         }
     }
 
+    private static Set<String> neverTogetherKeys(PlanSettings settings) {
+        Set<String> keys = new HashSet<>();
+        for (List<String> pair : settings.getNeverTogether()) {
+            keys.add(History.pairKey(new Player(pair.get(0)), new Player(pair.get(1))));
+        }
+        return keys;
+    }
+
     private static long sum(int[] values) {
         long total = 0;
         for (int v : values) {
@@ -391,6 +458,21 @@ public class TrainingPlanService {
             s.getMentalTrainerPicks().stream().filter(n -> n != null && !n.isBlank()).map(String::trim)
                     .distinct().forEach(picks::add);
             clean.setMentalTrainerPicks(picks);
+        }
+        if (s.getOnlyStationKids() != null) {
+            clean.setOnlyStationKids(new ArrayList<>(s.getOnlyStationKids().stream()
+                    .filter(n -> n != null && !n.isBlank()).map(String::trim).distinct().toList()));
+        }
+        clean.setEveryoneAtStation(s.isEveryoneAtStation());
+        if (s.getNeverTogether() != null) {
+            List<List<String>> pairs = new ArrayList<>();
+            for (List<String> pair : s.getNeverTogether()) {
+                if (pair != null && pair.size() == 2 && pair.get(0) != null && pair.get(1) != null
+                        && !pair.get(0).isBlank() && !pair.get(0).trim().equals(pair.get(1).trim())) {
+                    pairs.add(List.of(pair.get(0).trim(), pair.get(1).trim()));
+                }
+            }
+            clean.setNeverTogether(pairs);
         }
         return clean;
     }
@@ -465,7 +547,12 @@ public class TrainingPlanService {
             return sparringCount.getOrDefault(p.getName(), 0);
         }
 
-        private static String pairKey(Player a, Player b) {
+        // Balleimer and sparring turns together
+        int stationCount(Player p) {
+            return balleimer(p) + sparringCount(p);
+        }
+
+        static String pairKey(Player a, Player b) {
             String x = a.getName();
             String y = b.getName();
             return x.compareTo(y) < 0 ? x + "\u0000" + y : y + "\u0000" + x;

@@ -7,7 +7,7 @@
     <title>Trainingsplaner</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=6)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=8)}">
 </head>
 
 <body>
@@ -22,83 +22,116 @@
         <main class="page page-narrow">
             <div id="formError" class="notice notice-danger" role="alert" hidden></div>
 
+            <!-- Date -->
             <section class="panel">
-                <div class="field">
-                    <label for="trainingDate" class="field-label">Training</label>
-                    <div class="inline">
-                        <select id="trainingDate" class="control" required>
-                            <option th:each="date : ${trainingDates}" th:value="${date}" th:text="${date}"
-                                th:selected="${date == defaultDate}">Datum</option>
-                        </select>
-                        <button type="button" id="refreshBtn" class="btn btn-secondary btn-icon"
-                            aria-label="Anmeldungen neu aus dem Sheet laden" title="Neu aus dem Sheet laden">
-                            <i class="bi bi-cloud-download" aria-hidden="true"></i>
-                        </button>
-                    </div>
+                <label for="trainingDate" class="visually-hidden">Training</label>
+                <div class="inline">
+                    <span class="row-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
+                    <select id="trainingDate" class="control" required>
+                        <option th:each="date : ${trainingDates}" th:value="${date}" th:text="${date}"
+                            th:selected="${date == defaultDate}">Datum</option>
+                    </select>
+                    <button type="button" id="refreshBtn" class="btn btn-secondary btn-icon"
+                        aria-label="Anmeldungen neu aus dem Sheet laden" title="Neu aus dem Sheet laden">
+                        <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                    </button>
                 </div>
             </section>
 
+            <!-- Kids -->
             <section class="panel" aria-labelledby="playersHeading">
-                <div class="panel-head">
-                    <h2 id="playersHeading">Kinder <span id="playerCount" class="count">0</span></h2>
-                    <button type="button" id="togglePlayers" class="btn btn-quiet" aria-expanded="false"
-                        aria-controls="playerList">Liste zeigen</button>
-                </div>
-                <p id="rosterNote" class="hint" hidden>
-                    Von Hand angepasst.
-                    <button type="button" id="resetRoster" class="btn btn-quiet">Aus dem Sheet neu laden</button>
-                </p>
+                <h2 class="disclosure-heading">
+                    <button type="button" id="togglePlayers" class="disclosure" aria-expanded="false"
+                        aria-controls="playerList">
+                        <span class="row-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+                        <span id="playersHeading">Kinder</span>
+                        <span id="playerCount" class="count">0</span>
+                        <span id="rosterNote" class="tag-note" hidden>angepasst</span>
+                        <span class="disclosure-summary"></span>
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
+                </h2>
 
                 <div id="playerList" hidden>
                     <div class="sortbar" role="group" aria-label="Sortieren">
-                        <span>Sortieren:</span>
-                        <button type="button" class="btn" data-sort="name" aria-pressed="true">Name</button>
-                        <button type="button" class="btn" data-sort="elo" aria-pressed="false">Elo</button>
+                        <button type="button" class="btn" data-sort="name" aria-pressed="true">
+                            <i class="bi bi-sort-alpha-down" aria-hidden="true"></i> Name</button>
+                        <button type="button" class="btn" data-sort="elo" aria-pressed="false">
+                            <i class="bi bi-sort-numeric-down-alt" aria-hidden="true"></i> Elo</button>
+                        <button type="button" id="resetRoster" class="btn btn-quiet sortbar-end" hidden>
+                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Sheet</button>
                     </div>
                     <ul id="playerListBody" class="player-list"></ul>
                     <button type="button" id="addPlayerBtn" class="btn btn-secondary btn-block">
-                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Kind hinzufügen
+                        <i class="bi bi-person-plus" aria-hidden="true"></i> Kind
                     </button>
                 </div>
             </section>
 
+            <!-- Setup -->
             <section class="panel" aria-labelledby="setupHeading">
-                <h2 id="setupHeading">Einteilung</h2>
+                <h2 id="setupHeading" class="visually-hidden">Einteilung</h2>
 
-                <div class="stepper-row">
-                    <label for="numberOfExercises">Übungen</label>
-                    <div class="stepper">
-                        <button type="button" class="btn" data-step="-1" data-for="numberOfExercises"
-                            aria-label="Eine Übung weniger">−</button>
-                        <input type="number" id="numberOfExercises" inputmode="numeric" min="1" max="12" value="6">
-                        <button type="button" class="btn" data-step="1" data-for="numberOfExercises"
-                            aria-label="Eine Übung mehr">+</button>
+                <div class="block">
+                    <div class="block-head">
+                        <span class="row-icon" aria-hidden="true"><i class="bi bi-list-ol"></i></span>
+                        <label for="numberOfExercises" class="block-title">Übungen</label>
+                        <div class="stepper">
+                            <button type="button" class="btn" data-step="-1" data-for="numberOfExercises"
+                                aria-label="Eine Übung weniger">−</button>
+                            <input type="number" id="numberOfExercises" inputmode="numeric" min="1" max="12" value="6">
+                            <button type="button" class="btn" data-step="1" data-for="numberOfExercises"
+                                aria-label="Eine Übung mehr">+</button>
+                        </div>
                     </div>
                 </div>
-                <div class="field" style="margin-top: var(--space-4);">
-                    <h3 class="field-label" id="bucketHeading">Balleimer</h3>
-                    <span class="field-help">Pro Balleimer: wie viele Kinder gleichzeitig dort sind.</span>
+
+                <div class="block">
+                    <div class="block-head">
+                        <span class="row-icon is-bucket" aria-hidden="true"><i class="bi bi-basket"></i></span>
+                        <h3 class="block-title" id="bucketHeading">Balleimer</h3>
+                        <button type="button" class="btn btn-icon btn-quiet info-btn" aria-expanded="false"
+                            aria-controls="bucketInfo" aria-label="Was heisst das?"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                    </div>
+                    <p id="bucketInfo" class="info" hidden>Zahl = Kinder gleichzeitig an diesem Eimer. Jedes Kind
+                        kommt möglichst nur einmal dran.</p>
                     <ul id="bucketList" class="bucket-list" aria-labelledby="bucketHeading"></ul>
-                    <button type="button" id="addBucketBtn" class="btn btn-secondary btn-block">
-                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Balleimer hinzufügen
-                    </button>
+                    <button type="button" id="addBucketBtn" class="btn btn-quiet">
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Balleimer</button>
                 </div>
 
-                <div class="field" style="margin-top: var(--space-4);">
+                <div class="block">
+                    <div class="block-head">
+                        <span class="row-icon is-sparring" aria-hidden="true"><i class="bi bi-person-badge"></i></span>
+                        <h3 class="block-title"><label for="sparringName">Sparring</label></h3>
+                        <button type="button" class="btn btn-icon btn-quiet info-btn" aria-expanded="false"
+                            aria-controls="sparringInfo" aria-label="Was heisst das?"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                    </div>
+                    <p id="sparringInfo" class="info" hidden>Trainer oder Helfer. Jeder spielt pro Übung mit einem
+                        anderen Kind.</p>
+                    <div id="sparringList" class="chips chips-tight" aria-label="Sparringpartner"></div>
+                    <div class="inline" style="margin-top: var(--space-2);">
+                        <input type="text" id="sparringName" class="control" placeholder="Name" autocomplete="off"
+                            enterkeyhint="done">
+                        <button type="button" id="addSparringBtn" class="btn btn-secondary btn-icon"
+                            aria-label="Sparringpartner hinzufügen"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    </div>
+                </div>
+
+                <div class="block">
                     <h3 class="disclosure-heading">
                         <button type="button" id="toggleMental" class="disclosure" aria-expanded="false"
                             aria-controls="mentalBody">
+                            <span class="row-icon is-mental" aria-hidden="true"><i class="bi bi-lightbulb"></i></span>
                             <span>Mentaltrainer</span>
                             <span id="mentalSummary" class="disclosure-summary"></span>
                             <i class="bi bi-chevron-down" aria-hidden="true"></i>
                         </button>
                     </h3>
                     <div id="mentalBody" hidden>
-                        <span class="field-help">Die stärksten Kinder (höchste Elo) gehen zuerst. Eine Gruppe
-                            bleibt so viele Übungen wie unten eingestellt, dann kommt die nächste. 0 Kinder heisst kein
-                            Mentaltrainer.</span>
+                        <p class="info">Stärkste Kinder zuerst. Eine Gruppe bleibt für die eingestellten Übungen.</p>
                         <div class="stepper-row">
-                            <label for="mentalTrainerKids">Kinder pro Einheit</label>
+                            <label for="mentalTrainerKids"><i class="bi bi-people" aria-hidden="true"></i> Kinder</label>
                             <div class="stepper">
                                 <button type="button" class="btn" data-step="-1" data-for="mentalTrainerKids"
                                     aria-label="Ein Kind weniger beim Mentaltrainer">−</button>
@@ -108,7 +141,7 @@
                             </div>
                         </div>
                         <div class="stepper-row">
-                            <label for="mentalTrainerLength">Übungen pro Einheit</label>
+                            <label for="mentalTrainerLength"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Übungen am Stück</label>
                             <div class="stepper">
                                 <button type="button" class="btn" data-step="-1" data-for="mentalTrainerLength"
                                     aria-label="Einheit eine Übung kürzer">−</button>
@@ -117,39 +150,73 @@
                                     aria-label="Einheit eine Übung länger">+</button>
                             </div>
                         </div>
-                        <div class="field" style="margin-top: var(--space-3);">
-                            <label for="mentalPickSelect" class="field-label">Bestimmte Kinder zuerst</label>
-                            <span class="field-help" id="mentalPickHelp">Sie gehen in dieser Reihenfolge. Freie Plätze
-                                bekommen die stärksten Kinder.</span>
-                            <div class="inline">
-                                <select id="mentalPickSelect" class="control" aria-describedby="mentalPickHelp"></select>
-                                <button type="button" id="addMentalPick" class="btn btn-secondary">Hinzufügen</button>
-                            </div>
+                        <div class="sub-block">
+                            <label for="mentalPickSelect" class="sub-title">
+                                <i class="bi bi-sort-down" aria-hidden="true"></i> Diese Kinder zuerst</label>
                             <ol id="mentalPickList" class="pick-list" aria-label="Ausgewählte Kinder für den Mentaltrainer"></ol>
-                            <p id="mentalPickNote" class="hint" hidden></p>
+                            <p id="mentalPickNote" class="info is-warn" hidden></p>
+                            <div class="inline" style="margin-top: var(--space-2);">
+                                <select id="mentalPickSelect" class="control"></select>
+                                <button type="button" id="addMentalPick" class="btn btn-secondary btn-icon"
+                                    aria-label="Kind zur Reihenfolge hinzufügen"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="field" style="margin-top: var(--space-4);">
-                    <label for="sparringName" class="field-label">Sparringpartner</label>
-                    <span class="field-help" id="sparringHelp">Trainer oder Helfer, die pro Übung mit einem Kind
-                        spielen.</span>
-                    <div class="inline">
-                        <input type="text" id="sparringName" class="control" placeholder="Name" autocomplete="off"
-                            enterkeyhint="done" aria-describedby="sparringHelp">
-                        <button type="button" id="addSparringBtn" class="btn btn-secondary">Hinzufügen</button>
+                <div class="block">
+                    <h3 class="disclosure-heading">
+                        <button type="button" id="toggleRules" class="disclosure" aria-expanded="false"
+                            aria-controls="rulesBody">
+                            <span class="row-icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
+                            <span>Regeln</span>
+                            <span id="rulesSummary" class="disclosure-summary"></span>
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </button>
+                    </h3>
+                    <div id="rulesBody" hidden>
+                        <label class="switch-row" for="everyoneAtStation">
+                            <span class="switch-text">
+                                <span class="sub-title"><i class="bi bi-check2-all" aria-hidden="true"></i> Jedes Kind 1× Station</span>
+                                <span class="info">Mindestens einmal Balleimer oder Sparring.</span>
+                            </span>
+                            <input type="checkbox" id="everyoneAtStation" class="switch" role="switch">
+                        </label>
+
+                        <div class="sub-block">
+                            <label for="onlyStationSelect" class="sub-title">
+                                <i class="bi bi-signpost-split" aria-hidden="true"></i> Nur Balleimer / Sparring</label>
+                            <p class="info">Diese Kinder spielen nie im Paar.</p>
+                            <div id="onlyStationList" class="chips chips-tight" aria-label="Nur Balleimer oder Sparring"></div>
+                            <div class="inline" style="margin-top: var(--space-2);">
+                                <select id="onlyStationSelect" class="control"></select>
+                                <button type="button" id="addOnlyStation" class="btn btn-secondary btn-icon"
+                                    aria-label="Kind hinzufügen"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="sub-block">
+                            <span class="sub-title" id="neverHeading">
+                                <i class="bi bi-x-octagon" aria-hidden="true"></i> Nie zusammen</span>
+                            <p class="info">Spielen nie gegeneinander. Am gleichen Balleimer ist okay.</p>
+                            <ul id="neverList" class="pair-rules" aria-labelledby="neverHeading"></ul>
+                            <div class="never-add">
+                                <select id="neverA" class="control" aria-label="Erstes Kind"></select>
+                                <i class="bi bi-x-lg never-x" aria-hidden="true"></i>
+                                <select id="neverB" class="control" aria-label="Zweites Kind"></select>
+                                <button type="button" id="addNever" class="btn btn-secondary btn-icon"
+                                    aria-label="Paar hinzufügen"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
                     </div>
-                    <div id="sparringList" class="chips" aria-label="Sparringpartner"></div>
                 </div>
             </section>
         </main>
 
         <div class="actionbar">
             <div class="actionbar-inner">
-                <p id="stationSummary" class="summary" aria-live="polite"></p>
+                <p id="stationSummary" class="stats" aria-live="polite"></p>
                 <p id="stationWarning" class="summary is-warning" hidden></p>
-                <button type="button" id="stationFix" class="btn btn-secondary btn-wrap" hidden></button>
                 <button type="submit" id="generateBtn" class="btn btn-primary btn-lg">Plan erstellen</button>
             </div>
         </div>
@@ -169,12 +236,13 @@
                     <input type="text" class="control" id="playerName" autocomplete="off" required>
                 </div>
                 <div class="field">
-                    <label for="playerElo" class="field-label">Elo</label>
-                    <span class="field-help" id="eloHelp">Wie im Sheet, höher heisst stärker. Vorgeschlagen ist die
-                        tiefste Elo von heute.</span>
-                    <input type="number" class="control" id="playerElo" inputmode="numeric" min="1"
-                        max="3000" value="700" aria-describedby="eloHelp">
+                    <label for="playerElo" class="field-label">Elo <span class="label-note">höher = stärker</span></label>
+                    <input type="number" class="control" id="playerElo" inputmode="numeric" min="1" max="3000" value="700">
                 </div>
+                <label class="switch-row" for="playerOnlyStation">
+                    <span class="sub-title"><i class="bi bi-signpost-split" aria-hidden="true"></i> Nur Balleimer / Sparring</span>
+                    <input type="checkbox" id="playerOnlyStation" class="switch" role="switch">
+                </label>
                 <p id="playerError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-4);"></p>
             </div>
             <div class="sheet-foot">
@@ -184,10 +252,31 @@
         </form>
     </dialog>
 
+    <dialog id="oddDialog" class="sheet" aria-labelledby="oddTitle" aria-describedby="oddText">
+        <div class="sheet-head">
+            <h2 id="oddTitle"><i class="bi bi-exclamation-triangle-fill odd-icon" aria-hidden="true"></i> Ein Kind ohne Partner</h2>
+            <button type="button" class="btn btn-icon btn-quiet" id="closeOdd" aria-label="Abbrechen">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="sheet-body">
+            <div class="odd-visual" aria-hidden="true">
+                <span class="odd-pair"><i class="bi bi-person-fill"></i><i class="bi bi-person-fill"></i></span>
+                <span class="odd-pair"><i class="bi bi-person-fill"></i><i class="bi bi-person-fill"></i></span>
+                <span class="odd-alone"><i class="bi bi-person-fill"></i><i class="bi bi-question-lg"></i></span>
+            </div>
+            <p id="oddText" class="odd-text"></p>
+        </div>
+        <div class="sheet-foot sheet-foot-stack">
+            <button type="button" class="btn btn-primary btn-wrap" id="oddFix"></button>
+            <button type="button" class="btn btn-secondary" id="oddAnyway">Trotzdem erstellen</button>
+        </div>
+    </dialog>
+
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
 
     <script th:src="@{/js/common.js(v=2)}"></script>
-    <script th:src="@{/js/index.js(v=8)}"></script>
+    <script th:src="@{/js/index.js(v=10)}"></script>
 </body>
 
 </html>

@@ -51,13 +51,14 @@ function mentalSessionLabel(index) {
 // ===== HISTORY =====
 // Snapshots include the kids, since adjusting attendance changes them
 function snapshot() {
-    return clone({ players: plan.players, absent: plan.absent || [], exercises: plan.exercises });
+    return clone({ players: plan.players, absent: plan.absent || [], exercises: plan.exercises, settings: plan.settings });
 }
 
 function restore(state) {
     plan.players = state.players;
     plan.absent = state.absent;
     plan.exercises = state.exercises;
+    if (state.settings) plan.settings = state.settings;
 }
 
 function pushHistory() {
@@ -127,6 +128,16 @@ function changeSlot(slotIndex, name) {
 // What this exercise repeats from earlier ones; recomputed after every change
 function hintsFor(index, ex) {
     const hints = [];
+    const never = new Set((plan.settings.neverTogether || []).map(pair => [...pair].sort().join('\u0000')));
+    const stationOnly = new Set(plan.settings.onlyStationKids || []);
+    ex.pairs.forEach(p => {
+        if (never.has([p.player1.name, p.player2.name].sort().join('\u0000'))) {
+            hints.push(`${p.player1.name} & ${p.player2.name} sollen nie zusammen spielen.`);
+        }
+        [p.player1, p.player2].forEach(k => {
+            if (stationOnly.has(k.name)) hints.push(`${k.name} soll nur an Balleimer oder Sparring.`);
+        });
+    });
     const length = mentalLength();
     if (length > 1 && index % length !== 0 && ex.mentalTrainer.length > 0) {
         const previous = plan.exercises[index - 1].mentalTrainer.map(p => p.name).sort().join('|');
@@ -411,6 +422,7 @@ function replan(nextPlan, keepThrough) {
             plan.players = nextPlan.players;
             plan.absent = nextPlan.absent;
             plan.exercises = data.exercises;
+            plan.settings = data.settings;
             savePlan();
             render();
             return data;
@@ -440,9 +452,8 @@ function allKids() {
 function openAttendance() {
     attendance = { present: new Set(plan.players.map(p => p.name)), added: [] };
     $('applyFrom').innerHTML = plan.exercises.map((_, i) =>
-        `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
+        `<option value="${i + 1}">ab ${exerciseLabel(i + 1)}</option>`).join('');
     $('applyFrom').value = String(currentIndex + 1);
-    $('lateElo').value = defaultElo(plan.players);
     renderAttendance();
 }
 
@@ -458,7 +469,9 @@ function renderAttendance() {
     const open = attendance !== null;
     $('attendanceBody').hidden = !open;
     $('toggleAttendance').setAttribute('aria-expanded', String(open));
-    $('toggleAttendance').textContent = open ? 'Schliessen' : 'Anpassen';
+    $('toggleAttendance').innerHTML = open
+        ? '<i class="bi bi-x-lg" aria-hidden="true"></i> Schliessen'
+        : '<i class="bi bi-person-dash" aria-hidden="true"></i> Fehlt';
     $('presentCount').textContent = open ? attendance.present.size : plan.players.length;
     if (!open) return;
 
@@ -483,33 +496,10 @@ function renderAttendance() {
     $('applyAttendance').disabled = !changed || busy;
     const from = parseInt($('applyFrom').value || '1', 10);
     $('applyHint').textContent = from === 1
-        ? 'Der ganze Plan wird neu eingeteilt.'
-        : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt, wie sie ist.`;
+        ? 'Ganzer Plan neu.'
+        : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt.`;
 }
 
-function addLateKid() {
-    const name = $('lateName').value.trim();
-    const elo = parseInt($('lateElo').value, 10);
-    if (!name) return;
-    if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) {
-        toast(`Bitte eine Elo zwischen ${ELO_MIN} und ${ELO_MAX} eingeben.`);
-        return;
-    }
-    if (plan.settings.sparringPartners.includes(name)) {
-        toast(`${name} ist als Sparringpartner eingetragen.`);
-        return;
-    }
-    const known = allKids().find(k => k.name === name);
-    if (known) {
-        attendance.present.add(name);
-        toast(`${name} ist wieder dabei`);
-    } else {
-        attendance.added.push({ name, elo });
-        attendance.present.add(name);
-    }
-    $('lateName').value = '';
-    renderAttendance();
-}
 
 function applyAttendance() {
     if (busy || !attendanceChanged()) return;
@@ -529,6 +519,114 @@ function applyAttendance() {
             if (target) target.scrollIntoView({ block: 'start' });
         })
         .catch(error => toast('Anpassen ging nicht: ' + error.message));
+}
+
+// ===== KIND KOMMT DAZU =====
+// A late kid joins from a chosen exercise; the stations for the rest can change too
+const MAX_BALLEIMER = 6;
+const MAX_PER_BALLEIMER = 8;
+let addKidSizes = [];
+
+function openAddKid() {
+    if (editingIndex !== null) saveEdit({ quiet: true });
+    addKidSizes = [...(plan.settings.balleimerSizes || [])];
+    $('addKidName').value = '';
+    $('addKidElo').value = defaultElo(plan.players);
+    $('addKidOnlyStation').checked = false;
+    $('addKidMental').value = plan.settings.mentalTrainerKids || 0;
+    $('addKidFrom').innerHTML = plan.exercises.map((_, i) =>
+        `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
+    $('addKidFrom').value = String(currentIndex + 1);
+    // Absent kids can come back by name
+    $('addKidKnown').innerHTML = (plan.absent || []).map(k => `<option value="${escapeHtml(k.name)}">`).join('');
+    $('addKidError').hidden = true;
+    renderAddKid();
+    $('addKidDialog').showModal();
+    $('addKidName').focus();
+}
+
+function renderAddKid() {
+    const list = $('addKidBuckets');
+    list.innerHTML = '';
+    addKidSizes.forEach((size, index) => {
+        const n = index + 1;
+        const item = document.createElement('li');
+        item.innerHTML = `
+            <label><span class="bucket-no">${n}</span> <i class="bi bi-basket" aria-hidden="true"></i>
+                <span class="visually-hidden">Balleimer ${n}, Kinder</span></label>
+            <div class="stepper">
+                <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind weniger"${size <= 1 ? ' disabled' : ''}>−</button>
+                <input type="number" readonly tabindex="-1" value="${size}" aria-label="Balleimer ${n}: Kinder">
+                <button type="button" class="btn" aria-label="Balleimer ${n}: ein Kind mehr"${size >= MAX_PER_BALLEIMER ? ' disabled' : ''}>+</button>
+            </div>
+            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="Balleimer ${n} entfernen">
+                <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
+        const [minus, plus, remove] = item.querySelectorAll('button');
+        minus.addEventListener('click', () => { addKidSizes[index] -= 1; renderAddKid(); });
+        plus.addEventListener('click', () => { addKidSizes[index] += 1; renderAddKid(); });
+        remove.addEventListener('click', () => { addKidSizes.splice(index, 1); renderAddKid(); });
+        list.appendChild(item);
+    });
+    $('addKidAddBucket').disabled = addKidSizes.length >= MAX_BALLEIMER;
+
+    // What each exercise looks like with the new kid
+    const kids = plan.players.length + 1;
+    const atBuckets = addKidSizes.reduce((sum, size) => sum + size, 0);
+    const sparring = plan.settings.sparringPartners.length;
+    const mental = parseInt($('addKidMental').value, 10) || 0;
+    const playing = kids - atBuckets - sparring - mental;
+    const stats = $('addKidStats');
+    if (playing < 0) {
+        stats.className = 'stats is-error';
+        stats.textContent = `Zu viele Plätze: ${kids - playing} pro Übung, aber nur ${kids} Kinder.`;
+    } else {
+        const item = (icon, value, label, cls = '') => `<span class="stat ${cls}" title="${label}">`
+            + `<i class="bi ${icon}" aria-hidden="true"></i> ${value}<span class="visually-hidden"> ${label}</span></span>`;
+        let html = item('bi-people', kids, 'Kinder') + item('bi-arrow-left-right', Math.floor(playing / 2), 'Paare');
+        if (atBuckets > 0) html += item('bi-basket', atBuckets, 'am Balleimer', 'is-bucket');
+        if (sparring > 0) html += item('bi-person-badge', sparring, 'im Sparring', 'is-sparring');
+        if (mental > 0) html += item('bi-lightbulb', mental, 'beim Mentaltrainer', 'is-mental');
+        if (playing % 2 === 1) html += item('bi-exclamation-triangle-fill', 1, 'ohne Partner', 'is-warn');
+        stats.className = 'stats';
+        stats.innerHTML = html;
+    }
+    $('confirmAddKid').disabled = playing < 0 || busy;
+}
+
+function confirmAddKid(event) {
+    event.preventDefault();
+    const name = $('addKidName').value.trim();
+    const elo = parseInt($('addKidElo').value, 10);
+    const error = $('addKidError');
+    const showError = (message) => {
+        error.textContent = message;
+        error.hidden = false;
+    };
+    if (!name) return showError('Bitte einen Namen eingeben.');
+    if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) return showError(`Elo zwischen ${ELO_MIN} und ${ELO_MAX}.`);
+    if (plan.players.some(p => p.name === name)) return showError(`${name} ist schon da.`);
+    if (plan.settings.sparringPartners.includes(name)) return showError(`${name} ist Sparringpartner.`);
+
+    const from = parseInt($('addKidFrom').value, 10);
+    const next = clone(plan);
+    next.absent = (next.absent || []).filter(k => k.name !== name);
+    next.players.push({ name, elo });
+    next.settings.balleimerSizes = [...addKidSizes];
+    next.settings.mentalTrainerKids = parseInt($('addKidMental').value, 10) || 0;
+    const only = (next.settings.onlyStationKids || []).filter(n => n !== name);
+    if ($('addKidOnlyStation').checked) only.push(name);
+    next.settings.onlyStationKids = only;
+
+    $('confirmAddKid').disabled = true;
+    replan(next, from - 2)
+        .then(() => {
+            $('addKidDialog').close();
+            toast(`${name} ab ${exerciseLabel(from)} dabei`, { label: 'Rückgängig', run: undo });
+            const target = $(`ex-${from}`);
+            if (target) target.scrollIntoView({ block: 'start' });
+        })
+        .catch(e => showError('Ging nicht: ' + e.message))
+        .finally(() => renderAddKid());
 }
 
 // ===== PDF =====
@@ -582,14 +680,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     $('applyFrom').addEventListener('change', renderAttendance);
-    $('applyAttendance').addEventListener('click', applyAttendance);
-    $('addLateBtn').addEventListener('click', addLateKid);
-    $('lateName').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addLateKid();
-        }
+    $('addKidBtn').addEventListener('click', openAddKid);
+    $('addKidForm').addEventListener('submit', confirmAddKid);
+    $('cancelAddKid').addEventListener('click', () => $('addKidDialog').close());
+    $('closeAddKid').addEventListener('click', () => $('addKidDialog').close());
+    $('addKidAddBucket').addEventListener('click', () => {
+        addKidSizes.push(addKidSizes.length > 0 ? addKidSizes[addKidSizes.length - 1] : 2);
+        renderAddKid();
     });
+    document.querySelectorAll('[data-kid-step]').forEach(btn => btn.addEventListener('click', () => {
+        const input = $('addKidMental');
+        input.value = Math.min(8, Math.max(0, (parseInt(input.value, 10) || 0) + parseInt(btn.dataset.kidStep, 10)));
+        renderAddKid();
+    }));
+    $('addKidMental').addEventListener('input', renderAddKid);
+    // Picking an absent kid by name fills in their Elo
+    $('addKidName').addEventListener('input', () => {
+        const known = (plan.absent || []).find(k => k.name === $('addKidName').value.trim());
+        if (known) $('addKidElo').value = known.elo;
+    });
+    $('applyAttendance').addEventListener('click', applyAttendance);
 
     document.addEventListener('keydown', (e) => {
         // Leave Ctrl+Z inside form fields to the browser

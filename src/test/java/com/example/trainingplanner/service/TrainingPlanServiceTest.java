@@ -355,4 +355,61 @@ class TrainingPlanServiceTest {
                 .readValue("{\"name\":\"Alt\",\"klassierung\":812}", Player.class);
         assertEquals(812, player.getElo());
     }
+
+    @Test
+    void stationOnlyKidsAreAlwaysAtABalleimerOrSparring() {
+        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 2, 1);
+        s.setOnlyStationKids(new ArrayList<>(List.of("Kind 0", "Kind 5")));
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, rankedKids(12), s);
+            for (ExerciseRound round : plan.getExercises()) {
+                List<String> atStation = new ArrayList<>();
+                round.getBalleimer().forEach(b -> b.forEach(p -> atStation.add(p.getName())));
+                round.getSparring().forEach(sp -> atStation.add(sp.getPlayer().getName()));
+                assertTrue(atStation.containsAll(List.of("Kind 0", "Kind 5")), atStation.toString());
+                assertFalse(mentalNames(round).contains("Kind 0"));
+                assertEquals(12, new HashSet<>(namesIn(round)).size());
+                assertEquals(12, namesIn(round).size());
+            }
+        }
+    }
+
+    @Test
+    void everyoneGetsAStationTurnWhenAsked() {
+        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+        s.setEveryoneAtStation(true);
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, kids(16), s);
+            Set<String> atStation = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                round.getBalleimer().forEach(b -> b.forEach(p -> atStation.add(p.getName())));
+                round.getSparring().forEach(sp -> atStation.add(sp.getPlayer().getName()));
+            }
+            // 6 × (2 + 1) = 18 station places for 16 kids
+            assertEquals(16, atStation.size());
+            assertTrue(plan.getWarnings().stream().noneMatch(w -> w.contains("nie an einem Balleimer")),
+                    plan.getWarnings().toString());
+        }
+    }
+
+    @Test
+    void neverTogetherKidsDoNotPlayEachOther() {
+        List<Player> players = new ArrayList<>(List.of(new Player("A", 600), new Player("B", 610),
+                new Player("C", 2000), new Player("D", 2010)));
+        PlanSettings s = settings(2, 0, 2);
+        s.setNeverTogether(new ArrayList<>(List.of(List.of("A", "B"))));
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, players, s);
+            plan.getExercises().forEach(round -> round.getPairs().forEach(p ->
+                    assertNotEquals("A|B", pairKey(p))));
+        }
+    }
+
+    @Test
+    void neverTogetherIsReportedWhenThereIsNoOtherWay() {
+        PlanSettings s = settings(1, 0, 2);
+        s.setNeverTogether(new ArrayList<>(List.of(List.of("A", "B"))));
+        TrainingPlan plan = generate(0, new ArrayList<>(List.of(new Player("A", 600), new Player("B", 610))), s);
+        assertTrue(plan.getWarnings().stream().anyMatch(w -> w.contains("sollten nie zusammen spielen")));
+    }
 }
