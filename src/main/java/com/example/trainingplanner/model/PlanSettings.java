@@ -15,10 +15,12 @@ public class PlanSettings {
     private int mentalTrainerLength = 1;
     // Kids chosen by hand, in the order they fill the Mentaltrainer sessions
     private List<String> mentalTrainerPicks = new ArrayList<>();
-    // Kids who only ever go to a Balleimer or a sparring partner, never into a pair
-    private List<String> onlyStationKids = new ArrayList<>();
-    // Every kid gets at least one Balleimer or sparring turn per training
-    private boolean everyoneAtStation;
+    // Who gets a Balleimer or sparring turn first when not everyone can:
+    // "weaker", "stronger" or "random"
+    private String stationPriority = "random";
+    // Kids who never go to a Balleimer, and kids who never get a sparring partner
+    private List<String> noBalleimer = new ArrayList<>();
+    private List<String> noSparring = new ArrayList<>();
     // Pairs of kids who must not play each other (sharing a Balleimer is fine)
     private List<List<String>> neverTogether = new ArrayList<>();
 
@@ -102,20 +104,29 @@ public class PlanSettings {
         this.mentalTrainerPicks = mentalTrainerPicks;
     }
 
-    public List<String> getOnlyStationKids() {
-        return onlyStationKids;
+
+    public String getStationPriority() {
+        return stationPriority;
     }
 
-    public void setOnlyStationKids(List<String> onlyStationKids) {
-        this.onlyStationKids = onlyStationKids;
+    public void setStationPriority(String stationPriority) {
+        this.stationPriority = stationPriority;
     }
 
-    public boolean isEveryoneAtStation() {
-        return everyoneAtStation;
+    public List<String> getNoBalleimer() {
+        return noBalleimer;
     }
 
-    public void setEveryoneAtStation(boolean everyoneAtStation) {
-        this.everyoneAtStation = everyoneAtStation;
+    public void setNoBalleimer(List<String> noBalleimer) {
+        this.noBalleimer = noBalleimer;
+    }
+
+    public List<String> getNoSparring() {
+        return noSparring;
+    }
+
+    public void setNoSparring(List<String> noSparring) {
+        this.noSparring = noSparring;
     }
 
     public List<List<String>> getNeverTogether() {

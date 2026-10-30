@@ -357,42 +357,6 @@ class TrainingPlanServiceTest {
     }
 
     @Test
-    void stationOnlyKidsAreAlwaysAtABalleimerOrSparring() {
-        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 2, 1);
-        s.setOnlyStationKids(new ArrayList<>(List.of("Kind 0", "Kind 5")));
-        for (long seed = 0; seed < 10; seed++) {
-            TrainingPlan plan = generate(seed, rankedKids(12), s);
-            for (ExerciseRound round : plan.getExercises()) {
-                List<String> atStation = new ArrayList<>();
-                round.getBalleimer().forEach(b -> b.forEach(p -> atStation.add(p.getName())));
-                round.getSparring().forEach(sp -> atStation.add(sp.getPlayer().getName()));
-                assertTrue(atStation.containsAll(List.of("Kind 0", "Kind 5")), atStation.toString());
-                assertFalse(mentalNames(round).contains("Kind 0"));
-                assertEquals(12, new HashSet<>(namesIn(round)).size());
-                assertEquals(12, namesIn(round).size());
-            }
-        }
-    }
-
-    @Test
-    void everyoneGetsAStationTurnWhenAsked() {
-        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 0, 1);
-        s.setEveryoneAtStation(true);
-        for (long seed = 0; seed < 10; seed++) {
-            TrainingPlan plan = generate(seed, kids(16), s);
-            Set<String> atStation = new HashSet<>();
-            for (ExerciseRound round : plan.getExercises()) {
-                round.getBalleimer().forEach(b -> b.forEach(p -> atStation.add(p.getName())));
-                round.getSparring().forEach(sp -> atStation.add(sp.getPlayer().getName()));
-            }
-            // 6 × (2 + 1) = 18 station places for 16 kids
-            assertEquals(16, atStation.size());
-            assertTrue(plan.getWarnings().stream().noneMatch(w -> w.contains("nie an einem Balleimer")),
-                    plan.getWarnings().toString());
-        }
-    }
-
-    @Test
     void neverTogetherKidsDoNotPlayEachOther() {
         List<Player> players = new ArrayList<>(List.of(new Player("A", 600), new Player("B", 610),
                 new Player("C", 2000), new Player("D", 2010)));
@@ -411,5 +375,60 @@ class TrainingPlanServiceTest {
         s.setNeverTogether(new ArrayList<>(List.of(List.of("A", "B"))));
         TrainingPlan plan = generate(0, new ArrayList<>(List.of(new Player("A", 600), new Player("B", 610))), s);
         assertTrue(plan.getWarnings().stream().anyMatch(w -> w.contains("sollten nie zusammen spielen")));
+    }
+
+    private static java.util.Map<String, Integer> stationTurns(TrainingPlan plan) {
+        java.util.Map<String, Integer> turns = new java.util.HashMap<>();
+        plan.getExercises().forEach(round -> {
+            round.getBalleimer().forEach(b -> b.forEach(p -> turns.merge(p.getName(), 1, Integer::sum)));
+            round.getSparring().forEach(sp -> turns.merge(sp.getPlayer().getName(), 1, Integer::sum));
+        });
+        return turns;
+    }
+
+    @Test
+    void stationsAreSharedOutEvenly() {
+        // 6 exercises × (2 Balleimer + 1 sparring) = 18 places
+        for (int kids : new int[] { 12, 18, 20 }) {
+            for (long seed = 0; seed < 5; seed++) {
+                PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(2)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+                java.util.Map<String, Integer> turns = stationTurns(generate(seed, kids(kids), s));
+                int min = kids > 18 ? 0 : turns.values().stream().min(Integer::compare).orElse(0);
+                int max = turns.values().stream().max(Integer::compare).orElse(0);
+                assertTrue(max - (turns.size() < kids ? 0 : min) <= 1, kids + " kids: " + turns);
+            }
+        }
+    }
+
+    @Test
+    void priorityDecidesWhoGetsAStationWhenPlacesAreShort() {
+        // 3 exercises × 2 places = 6 places for 12 kids
+        for (String priority : List.of("weaker", "stronger")) {
+            PlanSettings s = new PlanSettings(3, new ArrayList<>(List.of(2)), new ArrayList<>(), 0, 1);
+            s.setStationPriority(priority);
+            java.util.Map<String, Integer> turns = stationTurns(generate(1, rankedKids(12), s));
+            // rankedKids: Kind 0 strongest ... Kind 11 weakest
+            Set<String> expected = new HashSet<>();
+            for (int i = 0; i < 6; i++) {
+                expected.add("Kind " + (priority.equals("stronger") ? i : 11 - i));
+            }
+            assertEquals(expected, turns.keySet(), priority);
+        }
+    }
+
+    @Test
+    void excludedKidsNeverGetThatStation() {
+        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(3)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+        s.setNoBalleimer(new ArrayList<>(List.of("Kind 0", "Kind 1")));
+        s.setNoSparring(new ArrayList<>(List.of("Kind 2")));
+        for (long seed = 0; seed < 10; seed++) {
+            TrainingPlan plan = generate(seed, kids(12), s);
+            for (ExerciseRound round : plan.getExercises()) {
+                round.getBalleimer().forEach(b -> b.forEach(p ->
+                        assertFalse(List.of("Kind 0", "Kind 1").contains(p.getName()))));
+                round.getSparring().forEach(sp -> assertNotEquals("Kind 2", sp.getPlayer().getName()));
+                assertEquals(12, new HashSet<>(namesIn(round)).size());
+            }
+        }
     }
 }

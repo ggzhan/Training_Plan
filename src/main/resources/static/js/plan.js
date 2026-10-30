@@ -129,14 +129,18 @@ function changeSlot(slotIndex, name) {
 function hintsFor(index, ex) {
     const hints = [];
     const never = new Set((plan.settings.neverTogether || []).map(pair => [...pair].sort().join('\u0000')));
-    const stationOnly = new Set(plan.settings.onlyStationKids || []);
+    const noBalleimer = new Set(plan.settings.noBalleimer || []);
+    const noSparring = new Set(plan.settings.noSparring || []);
+    ex.balleimer.flat().forEach(p => {
+        if (noBalleimer.has(p.name)) hints.push(`${p.name} soll nicht an den Balleimer.`);
+    });
+    ex.sparring.forEach(sp => {
+        if (noSparring.has(sp.player.name)) hints.push(`${sp.player.name} soll kein Sparring spielen.`);
+    });
     ex.pairs.forEach(p => {
         if (never.has([p.player1.name, p.player2.name].sort().join('\u0000'))) {
             hints.push(`${p.player1.name} & ${p.player2.name} sollen nie zusammen spielen.`);
         }
-        [p.player1, p.player2].forEach(k => {
-            if (stationOnly.has(k.name)) hints.push(`${k.name} soll nur an Balleimer oder Sparring.`);
-        });
     });
     const length = mentalLength();
     if (length > 1 && index % length !== 0 && ex.mentalTrainer.length > 0) {
@@ -532,7 +536,6 @@ function openAddKid() {
     addKidSizes = [...(plan.settings.balleimerSizes || [])];
     $('addKidName').value = '';
     $('addKidElo').value = defaultElo(plan.players);
-    $('addKidOnlyStation').checked = false;
     $('addKidMental').value = plan.settings.mentalTrainerKids || 0;
     $('addKidFrom').innerHTML = plan.exercises.map((_, i) =>
         `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
@@ -613,9 +616,6 @@ function confirmAddKid(event) {
     next.players.push({ name, elo });
     next.settings.balleimerSizes = [...addKidSizes];
     next.settings.mentalTrainerKids = parseInt($('addKidMental').value, 10) || 0;
-    const only = (next.settings.onlyStationKids || []).filter(n => n !== name);
-    if ($('addKidOnlyStation').checked) only.push(name);
-    next.settings.onlyStationKids = only;
 
     $('confirmAddKid').disabled = true;
     replan(next, from - 2)

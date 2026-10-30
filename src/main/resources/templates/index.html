@@ -7,7 +7,7 @@
     <title>Trainingsplaner</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=8)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=10)}">
 </head>
 
 <body>
@@ -175,24 +175,22 @@
                         </button>
                     </h3>
                     <div id="rulesBody" hidden>
-                        <label class="switch-row" for="everyoneAtStation">
-                            <span class="switch-text">
-                                <span class="sub-title"><i class="bi bi-check2-all" aria-hidden="true"></i> Jedes Kind 1× Station</span>
-                                <span class="info">Mindestens einmal Balleimer oder Sparring.</span>
-                            </span>
-                            <input type="checkbox" id="everyoneAtStation" class="switch" role="switch">
-                        </label>
+                        <div class="sub-block">
+                            <span class="sub-title" id="priorityHeading">
+                                <i class="bi bi-sort-up" aria-hidden="true"></i> Vorrang an Stationen</span>
+                            <p class="info">Wenn nicht alle an Balleimer oder Sparring kommen.</p>
+                            <div class="segmented" role="radiogroup" aria-labelledby="priorityHeading">
+                                <label><input type="radio" name="stationPriority" value="weaker"> Schwächere</label>
+                                <label><input type="radio" name="stationPriority" value="stronger"> Stärkere</label>
+                                <label><input type="radio" name="stationPriority" value="random" checked> Zufall</label>
+                            </div>
+                        </div>
 
                         <div class="sub-block">
-                            <label for="onlyStationSelect" class="sub-title">
-                                <i class="bi bi-signpost-split" aria-hidden="true"></i> Nur Balleimer / Sparring</label>
-                            <p class="info">Diese Kinder spielen nie im Paar.</p>
-                            <div id="onlyStationList" class="chips chips-tight" aria-label="Nur Balleimer oder Sparring"></div>
-                            <div class="inline" style="margin-top: var(--space-2);">
-                                <select id="onlyStationSelect" class="control"></select>
-                                <button type="button" id="addOnlyStation" class="btn btn-secondary btn-icon"
-                                    aria-label="Kind hinzufügen"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
-                            </div>
+                            <span class="sub-title" id="exceptionsHeading">
+                                <i class="bi bi-slash-circle" aria-hidden="true"></i> Ausnahmen</span>
+                            <p class="info">Einstellen beim Kind (<i class="bi bi-pencil" aria-label="bearbeiten"></i>).</p>
+                            <ul id="exceptionList" class="pair-rules" aria-labelledby="exceptionsHeading"></ul>
                         </div>
 
                         <div class="sub-block">
@@ -216,6 +214,7 @@
         <div class="actionbar">
             <div class="actionbar-inner">
                 <p id="stationSummary" class="stats" aria-live="polite"></p>
+                <p id="stationResult" class="summary" hidden></p>
                 <p id="stationWarning" class="summary is-warning" hidden></p>
                 <button type="submit" id="generateBtn" class="btn btn-primary btn-lg">Plan erstellen</button>
             </div>
@@ -239,9 +238,13 @@
                     <label for="playerElo" class="field-label">Elo <span class="label-note">höher = stärker</span></label>
                     <input type="number" class="control" id="playerElo" inputmode="numeric" min="1" max="3000" value="700">
                 </div>
-                <label class="switch-row" for="playerOnlyStation">
-                    <span class="sub-title"><i class="bi bi-signpost-split" aria-hidden="true"></i> Nur Balleimer / Sparring</span>
-                    <input type="checkbox" id="playerOnlyStation" class="switch" role="switch">
+                <label class="switch-row" for="playerNoBalleimer">
+                    <span class="sub-title"><i class="bi bi-basket" aria-hidden="true"></i> Kein Balleimer</span>
+                    <input type="checkbox" id="playerNoBalleimer" class="switch" role="switch">
+                </label>
+                <label class="switch-row" for="playerNoSparring">
+                    <span class="sub-title"><i class="bi bi-person-badge" aria-hidden="true"></i> Kein Sparring</span>
+                    <input type="checkbox" id="playerNoSparring" class="switch" role="switch">
                 </label>
                 <p id="playerError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-4);"></p>
             </div>
@@ -276,7 +279,7 @@
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
 
     <script th:src="@{/js/common.js(v=2)}"></script>
-    <script th:src="@{/js/index.js(v=10)}"></script>
+    <script th:src="@{/js/index.js(v=12)}"></script>
 </body>
 
 </html>

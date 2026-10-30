@@ -1124,11 +1124,6 @@ dialog.sheet::backdrop {
     opacity: 0.55;
 }
 
-.only-mark {
-    color: var(--sparring);
-    margin-left: 4px;
-}
-
 .bucket-list li label {
     display: inline-flex;
     align-items: center;
@@ -1368,4 +1363,73 @@ dialog.sheet::backdrop {
 
 .bucket-list:empty {
     display: none;
+}
+
+/* Segmented choice (Vorrang) */
+.segmented {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.segmented label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tap);
+    padding: 0 var(--space-2);
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.segmented label + label {
+    border-left: 1px solid var(--line);
+}
+
+.segmented input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.segmented label:has(input:checked) {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.segmented label:has(input:focus-visible) {
+    outline: 3px solid var(--accent);
+    outline-offset: -3px;
+}
+
+/* "no Balleimer" / "no sparring" mark */
+.ex-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: 4px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.ex-mark .bi-slash-circle {
+    color: var(--danger);
+    font-size: 0.75rem;
+}
+
+.ex-mark.is-bucket {
+    color: var(--bucket);
+}
+
+.ex-mark.is-sparring {
+    color: var(--sparring);
+}
+
+.ex-text {
+    color: var(--ink-2);
+    font-size: 0.875rem;
+    font-weight: 400;
 }
