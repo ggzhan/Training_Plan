@@ -1433,3 +1433,64 @@ dialog.sheet::backdrop {
     font-size: 0.875rem;
     font-weight: 400;
 }
+
+/* Kids list: name with Elo below, then the station toggles */
+.who-block {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.who-block .name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.elo-line {
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.player-list li {
+    gap: 2px;
+}
+
+/* On: the station's colour. Off (pressed = "kein ..."): grey with a red slash */
+.station-toggle {
+    position: relative;
+    border-radius: var(--radius-sm);
+    font-size: 1.125rem;
+}
+
+.station-toggle.is-bucket {
+    color: var(--bucket);
+}
+
+.station-toggle.is-sparring {
+    color: var(--sparring);
+}
+
+.station-toggle[aria-pressed="true"] {
+    color: var(--line);
+    background: var(--surface-2);
+}
+
+.station-toggle[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 26px;
+    height: 2px;
+    background: var(--danger);
+    transform: translate(-50%, -50%) rotate(-45deg);
+    border-radius: 2px;
+}
+
+@media (hover: hover) {
+    .station-toggle:hover {
+        background: var(--surface-2);
+    }
+}

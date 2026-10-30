@@ -7,7 +7,7 @@
     <title>Trainingsplaner</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=10)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=11)}">
 </head>
 
 <body>
@@ -189,7 +189,8 @@
                         <div class="sub-block">
                             <span class="sub-title" id="exceptionsHeading">
                                 <i class="bi bi-slash-circle" aria-hidden="true"></i> Ausnahmen</span>
-                            <p class="info">Einstellen beim Kind (<i class="bi bi-pencil" aria-label="bearbeiten"></i>).</p>
+                            <p class="info">In der Kinderliste <i class="bi bi-basket" aria-label="Balleimer"></i> oder
+                                <i class="bi bi-person-badge" aria-label="Sparring"></i> antippen.</p>
                             <ul id="exceptionList" class="pair-rules" aria-labelledby="exceptionsHeading"></ul>
                         </div>
 
@@ -238,14 +239,6 @@
                     <label for="playerElo" class="field-label">Elo <span class="label-note">höher = stärker</span></label>
                     <input type="number" class="control" id="playerElo" inputmode="numeric" min="1" max="3000" value="700">
                 </div>
-                <label class="switch-row" for="playerNoBalleimer">
-                    <span class="sub-title"><i class="bi bi-basket" aria-hidden="true"></i> Kein Balleimer</span>
-                    <input type="checkbox" id="playerNoBalleimer" class="switch" role="switch">
-                </label>
-                <label class="switch-row" for="playerNoSparring">
-                    <span class="sub-title"><i class="bi bi-person-badge" aria-hidden="true"></i> Kein Sparring</span>
-                    <input type="checkbox" id="playerNoSparring" class="switch" role="switch">
-                </label>
                 <p id="playerError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-4);"></p>
             </div>
             <div class="sheet-foot">
@@ -279,7 +272,7 @@
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
 
     <script th:src="@{/js/common.js(v=2)}"></script>
-    <script th:src="@{/js/index.js(v=12)}"></script>
+    <script th:src="@{/js/index.js(v=13)}"></script>
 </body>
 
 </html>

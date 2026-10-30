@@ -92,14 +92,27 @@ function renderPlayerList() {
     }
     currentPlayers.forEach((player, index) => {
         const item = document.createElement('li');
+        const name = escapeHtml(player.name);
+        const noBucket = noBalleimer.includes(player.name);
+        const noSpar = noSparring.includes(player.name);
         item.innerHTML = `
-            <span class="name">${escapeHtml(player.name)}${exceptionIcons(player.name)}</span>
-            <span class="level" title="Elo">${player.elo}</span>
-            <button type="button" class="btn btn-icon btn-quiet" aria-label="${escapeHtml(player.name)} bearbeiten">
+            <span class="who-block">
+                <span class="name">${name}</span>
+                <span class="elo-line">Elo ${player.elo}</span>
+            </span>
+            <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${noBucket}"
+                aria-label="Kein Balleimer für ${name}" title="${noBucket ? 'Kein Balleimer' : 'Balleimer erlaubt'}">
+                <i class="bi bi-basket" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${noSpar}"
+                aria-label="Kein Sparring für ${name}" title="${noSpar ? 'Kein Sparring' : 'Sparring erlaubt'}">
+                <i class="bi bi-person-badge" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-icon btn-quiet" aria-label="${name} bearbeiten">
                 <i class="bi bi-pencil" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="${escapeHtml(player.name)} entfernen">
+            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="${name} entfernen">
                 <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
-        const [editBtn, deleteBtn] = item.querySelectorAll('button');
+        const [bucketBtn, sparBtn, editBtn, deleteBtn] = item.querySelectorAll('button');
+        bucketBtn.addEventListener('click', () => toggleException('noBalleimer', player.name));
+        sparBtn.addEventListener('click', () => toggleException('noSparring', player.name));
         editBtn.addEventListener('click', () => openPlayerDialog(index));
         deleteBtn.addEventListener('click', () => deletePlayer(index));
         list.appendChild(item);
@@ -121,8 +134,6 @@ function openPlayerDialog(index) {
     $('playerDialogTitle').textContent = player ? 'Kind bearbeiten' : 'Kind hinzufügen';
     $('playerName').value = player ? player.name : '';
     $('playerElo').value = player ? player.elo : defaultElo(currentPlayers);
-    $('playerNoBalleimer').checked = !!player && noBalleimer.includes(player.name);
-    $('playerNoSparring').checked = !!player && noSparring.includes(player.name);
     $('playerError').hidden = true;
     $('playerDialog').showModal();
     $('playerName').focus();
@@ -155,10 +166,6 @@ function savePlayer(event) {
     } else {
         currentPlayers.push({ name, elo });
     }
-    noBalleimer = noBalleimer.filter(n => n !== name);
-    noSparring = noSparring.filter(n => n !== name);
-    if ($('playerNoBalleimer').checked) noBalleimer.push(name);
-    if ($('playerNoSparring').checked) noSparring.push(name);
     $('playerDialog').close();
     writeStored(STORAGE_KEYS.settings, currentSettings());
     rosterChanged();
@@ -526,6 +533,22 @@ function renderRules() {
         + excepted.filter(n => here.has(n)).length
         + neverTogether.filter(pair => pair.every(n => here.has(n))).length;
     $('rulesSummary').textContent = count === 0 ? 'Keine' : `${count} aktiv`;
+}
+
+// Tapping the Balleimer or sparring icon in a kid's row switches that station off
+// or back on for this kid
+function toggleException(list, name) {
+    const names = list === 'noBalleimer' ? noBalleimer : noSparring;
+    const off = !names.includes(name);
+    if (off) names.push(name);
+    else names.splice(names.indexOf(name), 1);
+    rulesChanged();
+    const station = list === 'noBalleimer' ? 'Balleimer' : 'Sparring';
+    toast(off ? `${name}: kein ${station}` : `${name}: ${station} wieder erlaubt`);
+    // Keep keyboard focus on the button that was tapped
+    const row = [...document.querySelectorAll('#playerListBody li')]
+        .find(li => li.querySelector('.name').textContent === name);
+    if (row) row.querySelector(list === 'noBalleimer' ? '.station-toggle.is-bucket' : '.station-toggle.is-sparring').focus();
 }
 
 // Small "no Balleimer" / "no sparring" marks next to a name
