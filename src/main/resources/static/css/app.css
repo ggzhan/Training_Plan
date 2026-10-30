@@ -1516,3 +1516,19 @@ dialog.sheet::backdrop {
     flex: 0 0 auto;
     margin-right: auto;
 }
+
+/* Entry page: on a phone the "back to plan" link drops under the title instead of squeezing it */
+.topbar-wrap {
+    flex-wrap: wrap;
+    row-gap: 0;
+}
+
+.topbar-wrap > a.btn {
+    padding-left: 0;
+}
+
+@media (min-width: 560px) {
+    .topbar-wrap > a.btn {
+        padding-left: var(--space-3);
+    }
+}

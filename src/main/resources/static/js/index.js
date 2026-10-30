@@ -773,7 +773,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (lastPlan && lastPlan.trainingDate) {
         const link = $('lastPlanLink');
         link.hidden = false;
-        link.querySelector('span').textContent = `Plan ${lastPlan.trainingDate}`;
+        // The date of that plan stays available on hover and for screen readers
+        link.title = `Plan vom ${lastPlan.trainingDate}`;
+        link.setAttribute('aria-label', `Zurück zum erstellten Plan vom ${lastPlan.trainingDate}`);
     }
 
     document.querySelectorAll('[data-step]').forEach(btn =>
