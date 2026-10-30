@@ -8,6 +8,8 @@ let neverTogether = []; // [name, name] pairs who must not play each other
 let stationPriority = 'random'; // who gets a station first: weaker, stronger, random
 let noBalleimer = []; // kid names who never go to a Balleimer
 let noSparring = []; // kid names who never get a sparring partner
+let extraStationKids = []; // kid names marked ⭐ for extra station turns
+let strongAtStations = false; // kids far from the rest in Elo get extra station turns
 const MAX_BALLEIMER = 6;
 const MAX_PER_BALLEIMER = 8;
 let editingPlayerIndex = null;
@@ -95,26 +97,28 @@ function renderPlayerList() {
         const name = escapeHtml(player.name);
         const noBucket = noBalleimer.includes(player.name);
         const noSpar = noSparring.includes(player.name);
+        const starred = extraStationKids.includes(player.name);
         item.innerHTML = `
             <span class="who-block">
                 <span class="name">${name}</span>
                 <span class="elo-line">Elo ${player.elo}</span>
             </span>
+            <button type="button" class="btn btn-icon star-toggle" aria-pressed="${starred}"
+                aria-label="Mehr Stationen für ${name}" title="${starred ? 'Mehr Stationen' : 'Normal'}">
+                <i class="bi ${starred ? 'bi-star-fill' : 'bi-star'}" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${noBucket}"
                 aria-label="Kein Balleimer für ${name}" title="${noBucket ? 'Kein Balleimer' : 'Balleimer erlaubt'}">
                 <i class="bi bi-basket" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${noSpar}"
                 aria-label="Kein Sparring für ${name}" title="${noSpar ? 'Kein Sparring' : 'Sparring erlaubt'}">
                 <i class="bi bi-person-badge" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon btn-quiet" aria-label="${name} bearbeiten">
-                <i class="bi bi-pencil" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet" aria-label="${name} entfernen">
-                <i class="bi bi-trash3" aria-hidden="true"></i></button>`;
-        const [bucketBtn, sparBtn, editBtn, deleteBtn] = item.querySelectorAll('button');
+            <button type="button" class="btn btn-icon btn-quiet" aria-label="${name} bearbeiten oder entfernen">
+                <i class="bi bi-pencil" aria-hidden="true"></i></button>`;
+        const [starBtn, bucketBtn, sparBtn, editBtn] = item.querySelectorAll('button');
+        starBtn.addEventListener('click', () => toggleException('extraStationKids', player.name));
         bucketBtn.addEventListener('click', () => toggleException('noBalleimer', player.name));
         sparBtn.addEventListener('click', () => toggleException('noSparring', player.name));
         editBtn.addEventListener('click', () => openPlayerDialog(index));
-        deleteBtn.addEventListener('click', () => deletePlayer(index));
         list.appendChild(item);
     });
 
@@ -132,6 +136,7 @@ function openPlayerDialog(index) {
     editingPlayerIndex = index;
     const player = index == null ? null : currentPlayers[index];
     $('playerDialogTitle').textContent = player ? 'Kind bearbeiten' : 'Kind hinzufügen';
+    $('deletePlayerBtn').hidden = !player;
     $('playerName').value = player ? player.name : '';
     $('playerElo').value = player ? player.elo : defaultElo(currentPlayers);
     $('playerError').hidden = true;
@@ -178,6 +183,7 @@ function renameEverywhere(oldName, newName) {
     mentalPicks = mentalPicks.map(swap);
     noBalleimer = noBalleimer.map(swap);
     noSparring = noSparring.map(swap);
+    extraStationKids = extraStationKids.map(swap);
     neverTogether = neverTogether.map(pair => pair.map(swap));
 }
 
@@ -212,6 +218,9 @@ function loadSettings() {
     if (['weaker', 'stronger', 'random'].includes(saved.stationPriority)) stationPriority = saved.stationPriority;
     if (Array.isArray(saved.noBalleimer)) noBalleimer = saved.noBalleimer;
     if (Array.isArray(saved.noSparring)) noSparring = saved.noSparring;
+    if (Array.isArray(saved.extraStationKids)) extraStationKids = saved.extraStationKids;
+    strongAtStations = saved.strongAtStations === true;
+    $('strongAtStations').checked = strongAtStations;
     document.querySelectorAll('input[name=stationPriority]').forEach(r => { r.checked = r.value === stationPriority; });
 }
 
@@ -226,6 +235,8 @@ function currentSettings() {
         stationPriority,
         noBalleimer,
         noSparring,
+        extraStationKids,
+        strongAtStations,
         neverTogether
     };
 }
@@ -484,12 +495,13 @@ function renderRules() {
 
     const exceptions = $('exceptionList');
     exceptions.innerHTML = '';
-    const excepted = [...new Set([...noBalleimer, ...noSparring])].sort((a, b) => a.localeCompare(b));
+    const excepted = [...new Set([...extraStationKids, ...noBalleimer, ...noSparring])].sort((a, b) => a.localeCompare(b));
     if (excepted.length === 0) exceptions.innerHTML = '<li class="info">Keine</li>';
     excepted.forEach(name => {
         const item = document.createElement('li');
         item.className = here.has(name) ? '' : 'is-away';
         const parts = [];
+        if (extraStationKids.includes(name)) parts.push('⭐ mehr Stationen');
         if (noBalleimer.includes(name)) parts.push('kein Balleimer');
         if (noSparring.includes(name)) parts.push('kein Sparring');
         item.innerHTML = `<span>${escapeHtml(name)}</span>
@@ -499,6 +511,7 @@ function renderRules() {
         item.querySelector('button').addEventListener('click', () => {
             noBalleimer = noBalleimer.filter(n => n !== name);
             noSparring = noSparring.filter(n => n !== name);
+            extraStationKids = extraStationKids.filter(n => n !== name);
             rulesChanged();
         });
         exceptions.appendChild(item);
@@ -529,7 +542,7 @@ function renderRules() {
     $('neverA').value = here.has(a) ? a : '';
     $('neverB').value = here.has(b) ? b : '';
 
-    const count = (stationPriority !== 'random' ? 1 : 0)
+    const count = (stationPriority !== 'random' ? 1 : 0) + (strongAtStations ? 1 : 0)
         + excepted.filter(n => here.has(n)).length
         + neverTogether.filter(pair => pair.every(n => here.has(n))).length;
     $('rulesSummary').textContent = count === 0 ? 'Keine' : `${count} aktiv`;
@@ -538,17 +551,24 @@ function renderRules() {
 // Tapping the Balleimer or sparring icon in a kid's row switches that station off
 // or back on for this kid
 function toggleException(list, name) {
-    const names = list === 'noBalleimer' ? noBalleimer : noSparring;
-    const off = !names.includes(name);
-    if (off) names.push(name);
+    const lists = { noBalleimer, noSparring, extraStationKids };
+    const names = lists[list];
+    const on = !names.includes(name);
+    if (on) names.push(name);
     else names.splice(names.indexOf(name), 1);
     rulesChanged();
-    const station = list === 'noBalleimer' ? 'Balleimer' : 'Sparring';
-    toast(off ? `${name}: kein ${station}` : `${name}: ${station} wieder erlaubt`);
+    const messages = {
+        noBalleimer: [`${name}: kein Balleimer`, `${name}: Balleimer wieder erlaubt`],
+        noSparring: [`${name}: kein Sparring`, `${name}: Sparring wieder erlaubt`],
+        extraStationKids: [`${name}: mehr Stationen`, `${name}: normal`]
+    };
+    toast(messages[list][on ? 0 : 1]);
     // Keep keyboard focus on the button that was tapped
+    const selector = { noBalleimer: '.station-toggle.is-bucket', noSparring: '.station-toggle.is-sparring',
+        extraStationKids: '.star-toggle' }[list];
     const row = [...document.querySelectorAll('#playerListBody li')]
         .find(li => li.querySelector('.name').textContent === name);
-    if (row) row.querySelector(list === 'noBalleimer' ? '.station-toggle.is-bucket' : '.station-toggle.is-sparring').focus();
+    if (row) row.querySelector(selector).focus();
 }
 
 // Small "no Balleimer" / "no sparring" marks next to a name
@@ -673,6 +693,11 @@ function renderStationResult(places, kids) {
     } else {
         text = `${extra} Kinder ${each + 1}×, ${kids - extra} Kinder ${each}×`;
     }
+    const kidNames = new Set(currentPlayers.map(p => p.name));
+    if (strongAtStations || extraStationKids.some(n => kidNames.has(n))) {
+        // Extra turns for strong or starred kids: the even split no longer holds exactly
+        text = 'Starke / ⭐ Kinder öfter, Rest gleichmässig';
+    }
     line.innerHTML = `<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Stationen: ${escapeHtml(text)}`;
 }
 
@@ -769,6 +794,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const open = $('toggleRules').getAttribute('aria-expanded') !== 'true';
         setOpen('toggleRules', 'rulesBody', open);
         writeStored(RULES_OPEN_KEY, open);
+    });
+    $('strongAtStations').addEventListener('change', (e) => {
+        strongAtStations = e.target.checked;
+        rulesChanged();
+    });
+    $('deletePlayerBtn').addEventListener('click', () => {
+        $('playerDialog').close();
+        deletePlayer(editingPlayerIndex);
     });
     document.querySelectorAll('input[name=stationPriority]').forEach(radio =>
         radio.addEventListener('change', () => {

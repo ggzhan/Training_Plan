@@ -161,7 +161,9 @@ function hintsFor(index, ex) {
         });
         const earlierBuckets = new Set(earlier.balleimer.flat().map(p => p.name));
         ex.balleimer.flat().forEach(p => {
-            if (earlierBuckets.has(p.name)) hints.push(`${p.name} war schon in ${label} am Balleimer.`);
+            // Extra turns are intended for starred kids, and for everyone when strong kids go more often
+            const intended = plan.settings.strongAtStations || (plan.settings.extraStationKids || []).includes(p.name);
+            if (earlierBuckets.has(p.name) && !intended) hints.push(`${p.name} war schon in ${label} am Balleimer.`);
         });
         ex.sparring.forEach(s => {
             if (earlier.sparring.some(o => o.partner === s.partner && o.player.name === s.player.name)) {

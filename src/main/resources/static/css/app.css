@@ -1494,3 +1494,25 @@ dialog.sheet::backdrop {
         background: var(--surface-2);
     }
 }
+
+/* ⭐ extra station turns */
+.star-toggle {
+    color: var(--ink-2);
+    font-size: 1.125rem;
+}
+
+.star-toggle[aria-pressed="true"] {
+    color: oklch(0.55 0.14 70);
+    background: oklch(0.96 0.04 85);
+}
+
+@media (hover: hover) {
+    .star-toggle:hover {
+        background: var(--surface-2);
+    }
+}
+
+.sheet-foot > #deletePlayerBtn {
+    flex: 0 0 auto;
+    margin-right: auto;
+}

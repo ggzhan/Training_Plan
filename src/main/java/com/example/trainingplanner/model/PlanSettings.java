@@ -21,6 +21,11 @@ public class PlanSettings {
     // Kids who never go to a Balleimer, and kids who never get a sparring partner
     private List<String> noBalleimer = new ArrayList<>();
     private List<String> noSparring = new ArrayList<>();
+    // Kids far from everyone else in Elo go to stations more often, taking turns,
+    // so the pairs left over are closer
+    private boolean strongAtStations;
+    // Kids the trainer marked for extra station turns (taking turns, never twice in a row)
+    private List<String> extraStationKids = new ArrayList<>();
     // Pairs of kids who must not play each other (sharing a Balleimer is fine)
     private List<List<String>> neverTogether = new ArrayList<>();
 
@@ -135,6 +140,22 @@ public class PlanSettings {
 
     public void setNeverTogether(List<List<String>> neverTogether) {
         this.neverTogether = neverTogether;
+    }
+
+    public boolean isStrongAtStations() {
+        return strongAtStations;
+    }
+
+    public void setStrongAtStations(boolean strongAtStations) {
+        this.strongAtStations = strongAtStations;
+    }
+
+    public List<String> getExtraStationKids() {
+        return extraStationKids;
+    }
+
+    public void setExtraStationKids(List<String> extraStationKids) {
+        this.extraStationKids = extraStationKids;
     }
 
     public int balleimerSlots() {

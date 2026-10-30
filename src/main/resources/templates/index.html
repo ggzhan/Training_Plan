@@ -7,7 +7,7 @@
     <title>Trainingsplaner</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=11)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=12)}">
 </head>
 
 <body>
@@ -175,6 +175,14 @@
                         </button>
                     </h3>
                     <div id="rulesBody" hidden>
+                        <label class="switch-row" for="strongAtStations">
+                            <span class="switch-text">
+                                <span class="sub-title"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> Starke Kinder öfter an Stationen</span>
+                                <span class="info">Wer im Elo weit weg vom Rest ist, kommt abwechselnd öfter dran. Die Paare werden ausgeglichener.</span>
+                            </span>
+                            <input type="checkbox" id="strongAtStations" class="switch" role="switch">
+                        </label>
+
                         <div class="sub-block">
                             <span class="sub-title" id="priorityHeading">
                                 <i class="bi bi-sort-up" aria-hidden="true"></i> Vorrang an Stationen</span>
@@ -189,7 +197,8 @@
                         <div class="sub-block">
                             <span class="sub-title" id="exceptionsHeading">
                                 <i class="bi bi-slash-circle" aria-hidden="true"></i> Ausnahmen</span>
-                            <p class="info">In der Kinderliste <i class="bi bi-basket" aria-label="Balleimer"></i> oder
+                            <p class="info">In der Kinderliste <i class="bi bi-star" aria-label="Stern"></i>,
+                                <i class="bi bi-basket" aria-label="Balleimer"></i> oder
                                 <i class="bi bi-person-badge" aria-label="Sparring"></i> antippen.</p>
                             <ul id="exceptionList" class="pair-rules" aria-labelledby="exceptionsHeading"></ul>
                         </div>
@@ -242,6 +251,9 @@
                 <p id="playerError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-4);"></p>
             </div>
             <div class="sheet-foot">
+                <button type="button" class="btn btn-icon btn-secondary btn-danger-quiet" id="deletePlayerBtn" hidden
+                    aria-label="Kind entfernen" title="Kind entfernen">
+                    <i class="bi bi-trash3" aria-hidden="true"></i></button>
                 <button type="button" class="btn btn-secondary" id="cancelPlayer">Abbrechen</button>
                 <button type="submit" class="btn btn-primary" id="savePlayerBtn">Speichern</button>
             </div>
@@ -272,7 +284,7 @@
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
 
     <script th:src="@{/js/common.js(v=2)}"></script>
-    <script th:src="@{/js/index.js(v=13)}"></script>
+    <script th:src="@{/js/index.js(v=14)}"></script>
 </body>
 
 </html>

@@ -431,4 +431,77 @@ class TrainingPlanServiceTest {
             }
         }
     }
+
+    private static List<Player> withStrongKids() {
+        List<Player> players = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            players.add(new Player("Kind " + i, 600 + i * 12));
+        }
+        players.add(new Player("Stark A", 1300));
+        players.add(new Player("Stark B", 1400));
+        players.add(new Player("Stark C", 1500));
+        return players;
+    }
+
+    private static long pairGaps(TrainingPlan plan) {
+        return plan.getExercises().stream().flatMap(r -> r.getPairs().stream())
+                .mapToLong(p -> Math.abs(p.getPlayer1().getElo() - p.getPlayer2().getElo())).sum();
+    }
+
+    private static List<Set<String>> stationsPerExercise(TrainingPlan plan) {
+        List<Set<String>> result = new ArrayList<>();
+        for (ExerciseRound round : plan.getExercises()) {
+            Set<String> names = new HashSet<>();
+            round.getBalleimer().forEach(b -> b.forEach(p -> names.add(p.getName())));
+            round.getSparring().forEach(sp -> names.add(sp.getPlayer().getName()));
+            result.add(names);
+        }
+        return result;
+    }
+
+    @Test
+    void strongKidsAtStationsMakeThePairsCloserAndTakeTurns() {
+        for (long seed = 0; seed < 10; seed++) {
+            PlanSettings off = new PlanSettings(6, new ArrayList<>(List.of(1)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+            PlanSettings on = new PlanSettings(6, new ArrayList<>(List.of(1)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+            on.setStrongAtStations(true);
+            TrainingPlan plain = generate(seed, withStrongKids(), off);
+            TrainingPlan strong = generate(seed, withStrongKids(), on);
+
+            assertTrue(pairGaps(strong) < pairGaps(plain), pairGaps(strong) + " vs " + pairGaps(plain));
+            List<Set<String>> stations = stationsPerExercise(strong);
+            int strongTurns = 0;
+            for (int e = 0; e < stations.size(); e++) {
+                for (String kid : List.of("Stark A", "Stark B", "Stark C")) {
+                    if (stations.get(e).contains(kid)) {
+                        strongTurns++;
+                        if (e > 0) {
+                            assertFalse(stations.get(e - 1).contains(kid), kid + " at a station twice in a row");
+                        }
+                    }
+                }
+            }
+            // 12 places in 6 exercises; the 3 strong kids get clearly more than their even 3
+            assertTrue(strongTurns >= 6, "strong turns " + strongTurns);
+        }
+    }
+
+    @Test
+    void starredKidsGetExtraStationTurnsButNotTwiceInARow() {
+        PlanSettings s = new PlanSettings(6, new ArrayList<>(List.of(1)), new ArrayList<>(List.of("Trainer A")), 0, 1);
+        s.setExtraStationKids(new ArrayList<>(List.of("Kind 3")));
+        for (long seed = 0; seed < 10; seed++) {
+            List<Set<String>> stations = stationsPerExercise(generate(seed, kids(16), s));
+            int turns = 0;
+            for (int e = 0; e < stations.size(); e++) {
+                if (stations.get(e).contains("Kind 3")) {
+                    turns++;
+                    if (e > 0) {
+                        assertFalse(stations.get(e - 1).contains("Kind 3"), "twice in a row");
+                    }
+                }
+            }
+            assertEquals(3, turns, "every other exercise");
+        }
+    }
 }
