@@ -79,7 +79,12 @@ function toast(message, action) {
         box.appendChild(button);
     }
     host.appendChild(box);
-    toastTimer = setTimeout(() => { host.innerHTML = ''; }, action ? 6000 : 3000);
+    const hasMotion = typeof Motion !== 'undefined';
+    if (hasMotion) Motion.toastIn(box);
+    toastTimer = setTimeout(() => {
+        if (hasMotion) Motion.toastOut(box, () => box.remove());
+        else host.innerHTML = '';
+    }, action ? 6000 : 3000);
 }
 
 // Keep page content clear of the fixed action bar, whatever its current height

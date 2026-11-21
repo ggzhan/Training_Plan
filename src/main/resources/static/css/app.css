@@ -371,7 +371,6 @@ select.control {
     width: 3.25rem;
     height: var(--tap);
     border: 0;
-    border-inline: 1px solid var(--line);
     text-align: center;
     font: inherit;
     font-weight: 600;
@@ -1531,4 +1530,126 @@ dialog.sheet::backdrop {
     .topbar-wrap > a.btn {
         padding-left: var(--space-3);
     }
+}
+
+/* ===== Motion ===== */
+/* Stepper: the dividers sit on the buttons, so the number can tick up/down inside */
+.stepper .btn:first-child {
+    border-right: 1px solid var(--line);
+}
+
+.stepper .btn:last-child {
+    border-left: 1px solid var(--line);
+}
+
+/* Transforms need a box: numbers that tick and names that glide */
+.stat-value,
+.row .who {
+    display: inline-block;
+}
+
+/* Every pressable thing gives way a little under the finger */
+.btn,
+.toggle-chip,
+.station-toggle,
+.star-toggle,
+.exnav a,
+.segmented label,
+.disclosure {
+    transition: background-color 150ms ease-out, border-color 150ms ease-out, scale 150ms ease-out;
+}
+
+.btn:not(:disabled):active,
+.toggle-chip:active,
+.exnav a:active,
+.segmented label:active {
+    scale: 0.97;
+}
+
+.station-toggle:active,
+.star-toggle:active {
+    scale: 0.92;
+}
+
+/* Übung number row: one highlight slides to the current number */
+.exnav-inner {
+    position: relative;
+}
+
+.exnav-indicator {
+    position: absolute;
+    top: var(--space-2);
+    left: 0;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.exnav a {
+    position: relative;
+    z-index: 1;
+}
+
+.exnav a[aria-current="true"] {
+    background: transparent;
+    border-color: var(--accent);
+}
+
+/* Dialog backdrop fades with the dialog */
+dialog.sheet[open]::backdrop {
+    animation: backdrop-in 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+dialog.sheet.is-closing::backdrop {
+    opacity: 0;
+    transition: opacity 150ms ease-in;
+}
+
+@keyframes backdrop-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* Toast: GSAP moves it; without GSAP the CSS entrance stays */
+.toast-msg {
+    will-change: transform, opacity;
+}
+
+/* Page to page: the browser cross-fades the two pages */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn:not(:disabled):active,
+    .toggle-chip:active,
+    .exnav a:active,
+    .segmented label:active,
+    .station-toggle:active,
+    .star-toggle:active {
+        scale: none;
+    }
+
+    dialog.sheet[open]::backdrop {
+        animation: none;
+    }
+}
+
+.has-gsap .toast-msg {
+    animation: none;
+}
+
+/* Lists that re-render in place: no scroll anchoring, or Chrome shifts the page to
+   follow a row that just moved */
+.player-list,
+.pick-list,
+.bucket-list,
+.exercises {
+    overflow-anchor: none;
 }

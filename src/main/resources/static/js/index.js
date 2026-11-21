@@ -58,7 +58,8 @@ function setPlayers(players, edited) {
 function rosterChanged() {
     rosterEdited = true;
     writeStored(STORAGE_KEYS.roster, { date: selectedDate(), players: currentPlayers });
-    renderPlayerList();
+    // Rows glide to their new place; an added kid fades in, a removed one fades out
+    Motion.flip('#playerListBody li', renderPlayerList);
 }
 
 function refreshFromSheet() {
@@ -94,6 +95,7 @@ function renderPlayerList() {
     }
     currentPlayers.forEach((player, index) => {
         const item = document.createElement('li');
+        item.dataset.flipId = player.name;
         const name = escapeHtml(player.name);
         const noBucket = noBalleimer.includes(player.name);
         const noSpar = noSparring.includes(player.name);
@@ -127,9 +129,9 @@ function renderPlayerList() {
 }
 
 function togglePlayerList() {
-    const list = $('playerList');
-    list.hidden = !list.hidden;
-    $('togglePlayers').setAttribute('aria-expanded', String(!list.hidden));
+    const open = $('playerList').hidden;
+    $('togglePlayers').setAttribute('aria-expanded', String(open));
+    Motion.toggle($('playerList'), open);
 }
 
 function openPlayerDialog(index) {
@@ -140,7 +142,7 @@ function openPlayerDialog(index) {
     $('playerName').value = player ? player.name : '';
     $('playerElo').value = player ? player.elo : defaultElo(currentPlayers);
     $('playerError').hidden = true;
-    $('playerDialog').showModal();
+    Motion.openDialog($('playerDialog'));
     $('playerName').focus();
 }
 
@@ -151,10 +153,12 @@ function savePlayer(event) {
     const error = $('playerError');
 
     let message = null;
+    let field = $('playerName');
     if (!name) {
         message = 'Bitte einen Namen eingeben.';
     } else if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) {
         message = `Bitte eine Elo zwischen ${ELO_MIN} und ${ELO_MAX} eingeben.`;
+        field = $('playerElo');
     } else {
         const duplicate = currentPlayers.findIndex(p => p.name === name);
         if (duplicate !== -1 && duplicate !== editingPlayerIndex) message = `${name} steht schon in der Liste.`;
@@ -162,6 +166,8 @@ function savePlayer(event) {
     if (message) {
         error.textContent = message;
         error.hidden = false;
+        Motion.shake(field);
+        field.focus();
         return;
     }
 
@@ -171,7 +177,7 @@ function savePlayer(event) {
     } else {
         currentPlayers.push({ name, elo });
     }
-    $('playerDialog').close();
+    Motion.closeDialog($('playerDialog'));
     writeStored(STORAGE_KEYS.settings, currentSettings());
     rosterChanged();
 }
@@ -250,7 +256,9 @@ function step(id, delta) {
     const input = $(id);
     const min = parseInt(input.min, 10);
     const max = parseInt(input.max, 10);
-    input.value = Math.min(max, Math.max(min, intValue(id) + delta));
+    const before = intValue(id);
+    input.value = Math.min(max, Math.max(min, before + delta));
+    if (intValue(id) !== before) Motion.tick(input, Math.sign(delta));
     settingsChanged();
 }
 
@@ -258,9 +266,10 @@ function step(id, delta) {
 // Whether the block is open is a per-browser convenience
 const MENTAL_OPEN_KEY = 'trainingsplaner.mentalOpen';
 
-function setMentalOpen(open) {
-    $('mentalBody').hidden = !open;
+function setMentalOpen(open, animate = true) {
     $('toggleMental').setAttribute('aria-expanded', String(open));
+    if (animate) Motion.toggle($('mentalBody'), open);
+    else $('mentalBody').hidden = !open;
 }
 
 // Which Einheit each pick lands in, given today's kids and the current settings
@@ -307,6 +316,7 @@ function renderMentalPicks() {
             }
         }
         const item = document.createElement('li');
+        item.dataset.flipId = name;
         item.innerHTML = `
             <span class="pick-pos" aria-hidden="true">${index + 1}</span>
             <span class="pick-text">
@@ -333,13 +343,14 @@ function addMentalPick() {
     if (!name || mentalPicks.includes(name)) return;
     mentalPicks.push(name);
     settingsChanged();
+    Motion.enter([$('mentalPickList').lastElementChild]);
     $('mentalPickSelect').focus();
 }
 
 function moveMentalPick(index) {
     if (index === 0) return;
     [mentalPicks[index - 1], mentalPicks[index]] = [mentalPicks[index], mentalPicks[index - 1]];
-    settingsChanged();
+    Motion.flip('#mentalPickList li', settingsChanged);
 }
 
 function removeMentalPick(index) {
@@ -416,11 +427,15 @@ function renderBalleimer() {
 }
 
 function setBucketSize(index, size) {
+    const before = balleimerSizes[index];
     balleimerSizes[index] = Math.min(MAX_PER_BALLEIMER, Math.max(1, isNaN(size) ? 1 : size));
     renderBalleimer();
     settingsChanged();
     const input = $(`bucket-${index + 1}`);
-    if (input) input.focus();
+    if (input) {
+        input.focus();
+        Motion.tick(input, Math.sign(balleimerSizes[index] - before));
+    }
 }
 
 function addBucket() {
@@ -429,6 +444,7 @@ function addBucket() {
     balleimerSizes.push(balleimerSizes.length > 0 ? balleimerSizes[balleimerSizes.length - 1] : 2);
     renderBalleimer();
     settingsChanged();
+    Motion.enter([$('bucketList').lastElementChild]);
 }
 
 function removeBucket(index) {
@@ -459,6 +475,7 @@ function addSparringPartner() {
     input.value = '';
     renderSparringPartners();
     settingsChanged();
+    Motion.enter([$('sparringList').lastElementChild]);
 }
 
 function removeSparringPartner(index) {
@@ -568,7 +585,11 @@ function toggleException(list, name) {
         extraStationKids: '.star-toggle' }[list];
     const row = [...document.querySelectorAll('#playerListBody li')]
         .find(li => li.querySelector('.name').textContent === name);
-    if (row) row.querySelector(selector).focus();
+    if (row) {
+        const button = row.querySelector(selector);
+        button.focus();
+        Motion.pop(button.querySelector('i'));
+    }
 }
 
 // Small "no Balleimer" / "no sparring" marks next to a name
@@ -606,17 +627,34 @@ function addNeverTogether() {
     $('neverA').value = '';
     $('neverB').value = '';
     rulesChanged();
+    Motion.enter([$('neverList').lastElementChild]);
 }
 
-function setOpen(buttonId, bodyId, open) {
-    $(bodyId).hidden = !open;
+function setOpen(buttonId, bodyId, open, animate = true) {
     $(buttonId).setAttribute('aria-expanded', String(open));
+    if (animate) Motion.toggle($(bodyId), open);
+    else $(bodyId).hidden = !open;
 }
 
 // ===== FEASIBILITY =====
 function stat(icon, value, label, extraClass = '') {
-    return `<span class="stat ${extraClass}" title="${escapeHtml(label)}"><i class="bi ${icon}" aria-hidden="true"></i>`
-        + ` ${escapeHtml(String(value))}<span class="visually-hidden"> ${escapeHtml(label)}</span></span>`;
+    return `<span class="stat ${extraClass}" title="${escapeHtml(label)}" data-key="${icon}"><i class="bi ${icon}" aria-hidden="true"></i>`
+        + ` <span class="stat-value">${escapeHtml(String(value))}</span><span class="visually-hidden"> ${escapeHtml(label)}</span></span>`;
+}
+
+// After the stats re-render, numbers that changed tick up or down; new stats fade in
+let lastStats = null;
+function animateStats(summary) {
+    const now = {};
+    summary.querySelectorAll('.stat').forEach(el => {
+        const key = el.dataset.key;
+        const value = parseInt(el.querySelector('.stat-value').textContent, 10);
+        now[key] = value;
+        if (lastStats === null) return;
+        if (!(key in lastStats)) Motion.enter([el]);
+        else if (lastStats[key] !== value) Motion.tick(el.querySelector('.stat-value'), Math.sign(value - lastStats[key]));
+    });
+    lastStats = now;
 }
 
 // Mirrors the server's checks: errors block, warnings only inform
@@ -674,6 +712,7 @@ function checkStations() {
         if (playing % 2 === 1) html += stat('bi-exclamation-triangle-fill', 1, 'ohne Partner', 'is-warn');
         summary.className = 'stats';
         summary.innerHTML = html;
+        animateStats(summary);
     }
     $('generateBtn').disabled = !!error;
 }
@@ -729,13 +768,26 @@ function openOddDialog() {
     if (fix) {
         fixButton.innerHTML = `<i class="bi bi-basket" aria-hidden="true"></i> ${escapeHtml(fix.label)} – dann erstellen`;
         fixButton.onclick = () => {
-            $('oddDialog').close();
+            Motion.closeDialog($('oddDialog'));
             fix.run();
             createPlan();
         };
     }
-    $('oddDialog').showModal();
+    Motion.openDialog($('oddDialog'));
+    oddVisual();
     (fix ? fixButton : $('oddAnyway')).focus();
+}
+
+// The two pairs settle first, then the kid left alone arrives with its question mark
+function oddVisual() {
+    const groups = document.querySelectorAll('#oddDialog .odd-visual > span');
+    if (!Motion.full() || !window.gsap) return;
+    gsap.fromTo(groups, { autoAlpha: 0, y: 6 }, {
+        autoAlpha: 1, y: 0, duration: 0.25, ease: 'power3.out', stagger: 0.08, delay: 0.1,
+        clearProps: 'transform,opacity,visibility'
+    });
+    gsap.fromTo('#oddDialog .odd-alone .bi-question-lg', { rotation: -20, scale: 0.6 },
+        { rotation: 0, scale: 1, duration: 0.35, ease: 'power3.out', delay: 0.3, clearProps: 'transform' });
 }
 
 function createPlan() {
@@ -780,7 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-step]').forEach(btn =>
         btn.addEventListener('click', () => step(btn.dataset.for, parseInt(btn.dataset.step, 10))));
-    setMentalOpen(readStored(MENTAL_OPEN_KEY) === true);
+    setMentalOpen(readStored(MENTAL_OPEN_KEY) === true, false);
     $('addMentalPick').addEventListener('click', addMentalPick);
     $('toggleMental').addEventListener('click', () => {
         const open = $('toggleMental').getAttribute('aria-expanded') !== 'true';
@@ -791,7 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $(id).addEventListener('input', settingsChanged));
     $('addBucketBtn').addEventListener('click', addBucket);
 
-    setOpen('toggleRules', 'rulesBody', readStored(RULES_OPEN_KEY) === true);
+    setOpen('toggleRules', 'rulesBody', readStored(RULES_OPEN_KEY) === true, false);
     $('toggleRules').addEventListener('click', () => {
         const open = $('toggleRules').getAttribute('aria-expanded') !== 'true';
         setOpen('toggleRules', 'rulesBody', open);
@@ -802,7 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rulesChanged();
     });
     $('deletePlayerBtn').addEventListener('click', () => {
-        $('playerDialog').close();
+        Motion.closeDialog($('playerDialog'));
         deletePlayer(editingPlayerIndex);
     });
     document.querySelectorAll('input[name=stationPriority]').forEach(radio =>
@@ -815,15 +867,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // ⓘ buttons show or hide the short explanation next to them
     document.querySelectorAll('.info-btn').forEach(btn => btn.addEventListener('click', () => {
         const info = $(btn.getAttribute('aria-controls'));
-        info.hidden = !info.hidden;
-        btn.setAttribute('aria-expanded', String(!info.hidden));
+        const open = info.hidden;
+        btn.setAttribute('aria-expanded', String(open));
+        Motion.toggle(info, open);
     }));
 
     $('oddAnyway').addEventListener('click', () => {
-        $('oddDialog').close();
+        Motion.closeDialog($('oddDialog'));
         createPlan();
     });
-    $('closeOdd').addEventListener('click', () => $('oddDialog').close());
+    $('closeOdd').addEventListener('click', () => Motion.closeDialog($('oddDialog')));
 
     $('addSparringBtn').addEventListener('click', addSparringPartner);
     // Enter in the name field adds the partner instead of submitting the form
@@ -837,12 +890,13 @@ document.addEventListener('DOMContentLoaded', () => {
     $('togglePlayers').addEventListener('click', togglePlayerList);
     $('addPlayerBtn').addEventListener('click', () => openPlayerDialog(null));
     $('playerForm').addEventListener('submit', savePlayer);
-    $('cancelPlayer').addEventListener('click', () => $('playerDialog').close());
-    $('closePlayerDialog').addEventListener('click', () => $('playerDialog').close());
+    $('cancelPlayer').addEventListener('click', () => Motion.closeDialog($('playerDialog')));
+    $('closePlayerDialog').addEventListener('click', () => Motion.closeDialog($('playerDialog')));
     document.querySelectorAll('.sortbar [data-sort]').forEach(btn =>
         btn.addEventListener('click', () => {
             sortColumn = btn.dataset.sort;
-            renderPlayerList();
+            // Re-sorting: every row glides to its new place
+            Motion.flip('#playerListBody li', renderPlayerList);
         }));
 
     $('trainingDate').addEventListener('change', () => loadPlayers());

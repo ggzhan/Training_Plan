@@ -72,7 +72,7 @@ function undo() {
     redoStack.push(snapshot());
     restore(historyStack.pop());
     savePlan();
-    render();
+    renderWithFlip();
     toast('Rückgängig gemacht');
 }
 
@@ -82,7 +82,7 @@ function redo() {
     historyStack.push(snapshot());
     restore(redoStack.pop());
     savePlan();
-    render();
+    renderWithFlip();
     toast('Wiederhergestellt');
 }
 
@@ -114,14 +114,20 @@ function changeSlot(slotIndex, name) {
     const target = slots[slotIndex];
     const previous = target.get();
     const chosen = playerByName(name);
-    const holder = slots.find((s, i) => i !== slotIndex && s.get().name === name);
+    const holderIndex = slots.findIndex((s, i) => i !== slotIndex && s.get().name === name);
+    const holder = holderIndex === -1 ? null : slots[holderIndex];
     target.set(chosen);
     if (holder) holder.set(previous);
     renderExercises();
     // Keep focus on the select that was just changed
     const again = document.querySelector(`select[data-slot="${slotIndex}"]`);
     if (again) again.focus();
-    if (holder) toast(`${previous.name} und ${name} getauscht`);
+    if (holder) {
+        // Both places light up, so the swap is visible
+        Motion.flash(again);
+        Motion.flash(document.querySelector(`select[data-slot="${holderIndex}"]`));
+        toast(`${previous.name} und ${name} getauscht`);
+    }
 }
 
 // ===== RULE HINTS =====
@@ -221,9 +227,10 @@ function render() {
 
 function renderNav() {
     const nav = $('exnavInner');
-    nav.innerHTML = plan.exercises.map((_, i) =>
+    nav.innerHTML = '<span class="exnav-indicator" aria-hidden="true"></span>' + plan.exercises.map((_, i) =>
         `<a href="#ex-${i + 1}" aria-label="${exerciseLabel(i + 1)}"${i === currentIndex ? ' aria-current="true"' : ''}>${i + 1}</a>`
     ).join('');
+    Motion.slideTo(nav.querySelector('.exnav-indicator'), nav.querySelectorAll('a')[currentIndex], true);
 }
 
 function renderExercises() {
@@ -235,21 +242,28 @@ function renderExercises() {
     observeExercises();
 }
 
-function names(players) {
-    return `<span class="who">${players.map(p => escapeHtml(p.name)).join(', ')}</span>`;
+// One span per kid, keyed by exercise and name, so re-plans can glide names to their new places
+function who(name, index, suffix = '') {
+    return `<span class="who" data-flip-id="${index}|${escapeHtml(name)}">${escapeHtml(name)}${suffix}</span>`;
+}
+
+// The comma rides along inside the name, so the row's gap does not open up before it
+function names(players, index) {
+    return players.map((p, i) => who(p.name, index, i < players.length - 1 ? ',' : '')).join(' ');
 }
 
 function renderViewCard(ex, index) {
     const section = document.createElement('section');
     section.className = 'exercise';
+    section.dataset.flipId = `card-${index}`;
     section.id = `ex-${index + 1}`;
     section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
 
     let body = '';
     if (ex.pairs.length > 0) {
         body += `<h3 class="group-label">Paare</h3><ul class="rows">`
-            + ex.pairs.map(p => `<li class="row"><span class="who">${escapeHtml(p.player1.name)}</span>`
-                + `<span class="amp">&amp;</span><span class="who">${escapeHtml(p.player2.name)}</span></li>`).join('')
+            + ex.pairs.map(p => `<li class="row">${who(p.player1.name, index)}`
+                + `<span class="amp">&amp;</span>${who(p.player2.name, index)}</li>`).join('')
             + '</ul>';
     }
     const stations = [];
@@ -257,15 +271,15 @@ function renderViewCard(ex, index) {
         const session = mentalSessionLabel(index);
         stations.push(`<li class="row row-mental">
         <span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer${session ? ` · ${session}` : ''}</span>
-        ${names(ex.mentalTrainer)}</li>`);
+        ${names(ex.mentalTrainer, index)}</li>`);
     }
     ex.balleimer.forEach((bucket, b) => stations.push(`<li class="row row-bucket">
-        <span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span> ${names(bucket)}</li>`));
+        <span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span> ${names(bucket, index)}</li>`));
     ex.sparring.forEach(sp => stations.push(`<li class="row row-sparring">
         <span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
-        <span class="who">${escapeHtml(sp.player.name)}</span></li>`));
+        ${who(sp.player.name, index)}</li>`));
     if (ex.unpaired.length > 0) stations.push(`<li class="row row-pause">
-        <span class="tag">Ohne Partner</span> ${names(ex.unpaired)}</li>`);
+        <span class="tag">Ohne Partner</span> ${names(ex.unpaired, index)}</li>`);
     if (stations.length > 0) {
         body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
     }
@@ -317,6 +331,7 @@ function renderEditCard(index) {
 
     const section = document.createElement('section');
     section.className = 'exercise is-editing';
+    section.dataset.flipId = `card-${index}`;
     section.id = `ex-${index + 1}`;
     section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
     section.innerHTML = `
@@ -330,8 +345,10 @@ function renderEditCard(index) {
 
 function renderBar() {
     const editing = editingIndex !== null;
+    const switched = $('editBar').hidden === editing;
     $('viewBar').hidden = editing;
     $('editBar').hidden = !editing;
+    if (switched) Motion.enter([editing ? $('editBar') : $('viewBar')]);
     $('undoBtn').disabled = historyStack.length === 0 || busy;
     $('redoBtn').disabled = redoStack.length === 0 || busy;
     if (editing) {
@@ -366,6 +383,7 @@ function observeExercises() {
                 if (i === currentIndex) {
                     a.setAttribute('aria-current', 'true');
                     a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    Motion.slideTo(document.querySelector('#exnavInner .exnav-indicator'), a);
                 } else {
                     a.removeAttribute('aria-current');
                 }
@@ -383,7 +401,8 @@ function startEdit(index) {
     renderExercises();
     renderBar();
     const card = $(`ex-${index + 1}`);
-    card.scrollIntoView({ block: 'start' });
+    Motion.scrollTo(card);
+    Motion.enter(card.querySelectorAll('.slot-group'));
     const first = card.querySelector('select');
     if (first) first.focus({ preventScroll: true });
 }
@@ -401,6 +420,7 @@ function saveEdit({ quiet = false } = {}) {
     draft = null;
     renderExercises();
     renderBar();
+    if (changed) Motion.flash($(`ex-${index + 1}`));
     if (!quiet) toast(changed ? `${exerciseLabel(index + 1)} gespeichert` : 'Keine Änderung');
 }
 
@@ -410,6 +430,12 @@ function cancelEdit() {
     draft = null;
     renderExercises();
     renderBar();
+}
+
+// Re-render after a re-plan or undo: every name glides from its old place in an
+// exercise to its new one, so the trainer sees who moved
+function renderWithFlip() {
+    Motion.flip('.exercise [data-flip-id]', render);
 }
 
 // ===== SERVER: RE-PLAN =====
@@ -430,7 +456,7 @@ function replan(nextPlan, keepThrough) {
             plan.exercises = data.exercises;
             plan.settings = data.settings;
             savePlan();
-            render();
+            renderWithFlip();
             return data;
         })
         .finally(() => {
@@ -461,6 +487,14 @@ function openAttendance() {
         `<option value="${i + 1}">ab ${exerciseLabel(i + 1)}</option>`).join('');
     $('applyFrom').value = String(currentIndex + 1);
     renderAttendance();
+    Motion.toggle($('attendanceBody'), true);
+    Motion.enter($('attendanceChips').children);
+}
+
+function closeAttendance(onClosed) {
+    attendance = null;
+    renderAttendance();
+    Motion.toggle($('attendanceBody'), false, onClosed);
 }
 
 function attendanceChanged() {
@@ -473,7 +507,6 @@ function attendanceChanged() {
 
 function renderAttendance() {
     const open = attendance !== null;
-    $('attendanceBody').hidden = !open;
     $('toggleAttendance').setAttribute('aria-expanded', String(open));
     $('toggleAttendance').innerHTML = open
         ? '<i class="bi bi-x-lg" aria-hidden="true"></i> Schliessen'
@@ -518,11 +551,9 @@ function applyAttendance() {
 
     replan(next, from - 2)
         .then(() => {
-            attendance = null;
-            renderAttendance();
+            // Scroll once the panel above has closed, or the target moves up mid-scroll
+            closeAttendance(() => Motion.scrollTo($(`ex-${from}`)));
             toast(`Plan ab ${exerciseLabel(from)} angepasst`, { label: 'Rückgängig', run: undo });
-            const target = $(`ex-${from}`);
-            if (target) target.scrollIntoView({ block: 'start' });
         })
         .catch(error => toast('Anpassen ging nicht: ' + error.message));
 }
@@ -546,7 +577,7 @@ function openAddKid() {
     $('addKidKnown').innerHTML = (plan.absent || []).map(k => `<option value="${escapeHtml(k.name)}">`).join('');
     $('addKidError').hidden = true;
     renderAddKid();
-    $('addKidDialog').showModal();
+    Motion.openDialog($('addKidDialog'));
     $('addKidName').focus();
 }
 
@@ -603,14 +634,16 @@ function confirmAddKid(event) {
     const name = $('addKidName').value.trim();
     const elo = parseInt($('addKidElo').value, 10);
     const error = $('addKidError');
-    const showError = (message) => {
+    const showError = (message, field) => {
         error.textContent = message;
         error.hidden = false;
+        Motion.shake(field || error);
+        if (field) field.focus();
     };
-    if (!name) return showError('Bitte einen Namen eingeben.');
-    if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) return showError(`Elo zwischen ${ELO_MIN} und ${ELO_MAX}.`);
-    if (plan.players.some(p => p.name === name)) return showError(`${name} ist schon da.`);
-    if (plan.settings.sparringPartners.includes(name)) return showError(`${name} ist Sparringpartner.`);
+    if (!name) return showError('Bitte einen Namen eingeben.', $('addKidName'));
+    if (isNaN(elo) || elo < ELO_MIN || elo > ELO_MAX) return showError(`Elo zwischen ${ELO_MIN} und ${ELO_MAX}.`, $('addKidElo'));
+    if (plan.players.some(p => p.name === name)) return showError(`${name} ist schon da.`, $('addKidName'));
+    if (plan.settings.sparringPartners.includes(name)) return showError(`${name} ist Sparringpartner.`, $('addKidName'));
 
     const from = parseInt($('addKidFrom').value, 10);
     const next = clone(plan);
@@ -622,10 +655,10 @@ function confirmAddKid(event) {
     $('confirmAddKid').disabled = true;
     replan(next, from - 2)
         .then(() => {
-            $('addKidDialog').close();
+            Motion.closeDialog($('addKidDialog'));
             toast(`${name} ab ${exerciseLabel(from)} dabei`, { label: 'Rückgängig', run: undo });
             const target = $(`ex-${from}`);
-            if (target) target.scrollIntoView({ block: 'start' });
+            Motion.scrollTo(target);
         })
         .catch(e => showError('Ging nicht: ' + e.message))
         .finally(() => renderAddKid());
@@ -665,6 +698,7 @@ function exportPdf() {
 document.addEventListener('DOMContentLoaded', () => {
     render();
     if (!plan) return;
+    Motion.enter(document.querySelectorAll('.exercise'));
 
     $('undoBtn').addEventListener('click', undo);
     $('redoBtn').addEventListener('click', redo);
@@ -674,18 +708,14 @@ document.addEventListener('DOMContentLoaded', () => {
     $('regenerateBtn').addEventListener('click', regenerateFollowing);
 
     $('toggleAttendance').addEventListener('click', () => {
-        if (attendance) {
-            attendance = null;
-            renderAttendance();
-        } else {
-            openAttendance();
-        }
+        if (attendance) closeAttendance();
+        else openAttendance();
     });
     $('applyFrom').addEventListener('change', renderAttendance);
     $('addKidBtn').addEventListener('click', openAddKid);
     $('addKidForm').addEventListener('submit', confirmAddKid);
-    $('cancelAddKid').addEventListener('click', () => $('addKidDialog').close());
-    $('closeAddKid').addEventListener('click', () => $('addKidDialog').close());
+    $('cancelAddKid').addEventListener('click', () => Motion.closeDialog($('addKidDialog')));
+    $('closeAddKid').addEventListener('click', () => Motion.closeDialog($('addKidDialog')));
     $('addKidAddBucket').addEventListener('click', () => {
         addKidSizes.push(addKidSizes.length > 0 ? addKidSizes[addKidSizes.length - 1] : 2);
         renderAddKid();
