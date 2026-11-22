@@ -298,13 +298,15 @@ function joinOf(ex, unpairedIndex) {
 }
 
 // Pairs and stations of one Übung, shared by the cards and the Jetzt-Ansicht
+// Stations come first: "where do I go?" is what the coach calls out first
 function cardBody(ex, index) {
     let body = '';
+    let pairsHtml = '';
     if (ex.pairs.length > 0) {
         // A kid without a partner plays as the third with the pair the planner chose
         const thirds = (pairIndex) => ex.unpaired.filter((_, u) => joinOf(ex, u) === pairIndex)
             .map(k => `<span class="amp">+</span>${who(k.name, index)}<span class="third-note">als Dritter</span>`).join('');
-        body += `<h3 class="group-label">Paare</h3><ul class="rows">`
+        pairsHtml = `<h3 class="group-label">Paare</h3><ul class="rows">`
             + ex.pairs.map((p, i) => `<li class="row">${who(p.player1.name, index)}`
                 + `<span class="amp">&amp;</span>${who(p.player2.name, index)}${thirds(i)}</li>`).join('')
             + '</ul>';
@@ -331,7 +333,7 @@ function cardBody(ex, index) {
     if (stations.length > 0) {
         body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
     }
-    return body;
+    return body + pairsHtml;
 }
 
 // Played Übungen fold to one line during the training; tap to look back
@@ -350,8 +352,9 @@ function renderViewCard(ex, index) {
     let body = cardBody(ex, index);
     body += hintsHtml(index, ex);
 
-    const editBtn = `<button type="button" class="btn btn-quiet edit-btn" aria-label="${exerciseLabel(index + 1)} bearbeiten">
-                <i class="bi bi-pencil" aria-hidden="true"></i> <span class="btn-label">Bearbeiten</span></button>`;
+    // Editing sits at the bottom of the card, away from "Gross" in the header
+    const editBtn = `<button type="button" class="btn btn-quiet btn-block edit-btn" aria-label="${exerciseLabel(index + 1)} bearbeiten">
+                <i class="bi bi-pencil" aria-hidden="true"></i> Bearbeiten</button>`;
     if (played) {
         section.innerHTML = `
         <div class="exercise-head">
@@ -371,8 +374,8 @@ function renderViewCard(ex, index) {
         section.innerHTML = `
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} ${badge}</h2>
-            ${bigBtn}${editBtn}
-        </div>${body}`;
+            ${bigBtn}
+        </div>${body}${editBtn}`;
         const big = section.querySelector('.focus-open');
         if (big) big.addEventListener('click', openFocus);
     }
@@ -557,15 +560,15 @@ function renderBar() {
     const next = $('nextBtn');
     const icon = next.querySelector('i');
     if (now === null) {
-        $('nextLabel').textContent = 'Start';
+        $('nextLabel').textContent = `${exerciseLabel(1)} starten`;
         next.setAttribute('aria-label', `Training starten mit ${exerciseLabel(1)}`);
         icon.className = 'bi bi-play-fill';
     } else if (now < total - 1) {
-        $('nextLabel').innerHTML = `Weiter: <span class="next-num">${now + 2}</span>`;
+        $('nextLabel').innerHTML = `Übung <span class="next-num">${now + 2}</span> starten`;
         next.setAttribute('aria-label', `${exerciseLabel(now + 1)} fertig, weiter mit ${exerciseLabel(now + 2)}`);
         icon.className = 'bi bi-skip-end-fill';
     } else if (now === total - 1) {
-        $('nextLabel').textContent = 'Fertig';
+        $('nextLabel').textContent = 'Training beenden';
         next.setAttribute('aria-label', `${exerciseLabel(total)} fertig, Training beendet`);
         icon.className = 'bi bi-flag-fill';
     } else {
@@ -585,6 +588,7 @@ function advance() {
     const now = nowIndex();
     if (now !== null && now >= total) return;
     pushHistory();
+    const starting = now === null;
     plan.now = now === null ? 0 : now + 1;
     savePlan();
     renderNav();
@@ -599,6 +603,8 @@ function advance() {
         Motion.scrollTo(card);
         Motion.pop(card.querySelector('.ex-badge'));
     }
+    // Starting on a phone goes straight into the Jetzt-Ansicht
+    if (starting && !focusOpen() && phoneFocusDefault()) openFocus();
 }
 
 // Highlight the exercise nearest the top in the number row
@@ -846,8 +852,8 @@ function applyAttendance() {
     const before = new Set(plan.players.map(p => p.name));
     replan(next, from - 2)
         .then(() => {
+            // Stay on the running card; the changed ones say "Neu eingeteilt"
             closeAttendance();
-            Motion.scrollTo($(`ex-${from}`));
             // "Ab Übung 3 ohne Ved" says exactly what happened
             const gone = next.absent.filter(k => before.has(k.name)).map(k => k.name);
             const message = gone.length > 0 && gone.length <= 3
@@ -878,9 +884,16 @@ function openAddKid() {
     // Absent kids can come back by name
     $('addKidKnown').innerHTML = (plan.absent || []).map(k => `<option value="${escapeHtml(k.name)}">`).join('');
     $('addKidError').hidden = true;
+    setAddKidStations(false);
     renderAddKid();
     Motion.openDialog($('addKidDialog'));
     $('addKidName').focus();
+}
+
+function setAddKidStations(open) {
+    $('addKidStationsBlock').hidden = !open;
+    $('addKidStationsToggle').setAttribute('aria-expanded', String(open));
+    $('addKidStationsToggle').hidden = open;
 }
 
 function renderAddKid() {
@@ -929,6 +942,10 @@ function renderAddKid() {
         stats.innerHTML = html;
     }
     renderAddKidFix(playing);
+    // Stations only come up when the count needs them, or on request
+    if ((playing < 0 || playing % 2 === 1) && $('addKidStationsBlock').hidden && !addKidFixAction) {
+        setAddKidStations(true);
+    }
     const from = parseInt($('addKidFrom').value || '1', 10);
     $('confirmAddKid').textContent = from === 1 ? 'Hinzufügen' : `Ab ${exerciseLabel(from)} dabei`;
     $('confirmAddKid').disabled = playing < 0 || busy;
@@ -984,8 +1001,6 @@ function confirmAddKid(event) {
         .then(() => {
             Motion.closeDialog($('addKidDialog'));
             toast(`${name} ab ${exerciseLabel(from)} dabei${unpairedNote(from - 1)}`, { label: 'Rückgängig', run: undo });
-            const target = $(`ex-${from}`);
-            Motion.scrollTo(target);
         })
         .catch(e => showError('Hinzufügen ging nicht. ' + friendlyError(e)))
         .finally(() => renderAddKid());
@@ -995,6 +1010,12 @@ function confirmAddKid(event) {
 // Only one Übung, big: what the coach glances at between drills. Browsing
 // (swipe, arrows) never changes which Übung is running; Weiter does.
 let focusIndex = 0;
+
+// On a phone, a running training opens straight in the Jetzt-Ansicht
+function phoneFocusDefault() {
+    const now = nowIndex();
+    return window.matchMedia('(max-width: 640px)').matches && now !== null && now < plan.exercises.length;
+}
 
 function focusOpen() {
     return $('focusDialog').open;
@@ -1019,20 +1040,14 @@ function renderFocus(direction = 0) {
     $('focusDialog').classList.toggle('is-now', focusIndex === now);
     const body = $('focusBody');
     body.innerHTML = cardBody(ex, focusIndex);
-    // At a glance the first question is "where do I go?": stations come first
-    const labels = body.querySelectorAll(':scope > .group-label');
-    if (labels.length === 2) {
-        const stationsList = labels[1].nextElementSibling;
-        body.prepend(labels[1], stationsList);
-    }
     $('focusPrev').disabled = focusIndex === 0;
     $('focusNext').disabled = focusIndex === total - 1;
 
     const label = $('focusAdvanceLabel');
     const button = $('focusAdvance');
-    if (now === null) label.textContent = 'Start';
-    else if (now < total - 1) label.textContent = `Weiter: ${now + 2}`;
-    else if (now === total - 1) label.textContent = 'Fertig';
+    if (now === null) label.textContent = `${exerciseLabel(1)} starten`;
+    else if (now < total - 1) label.textContent = `${exerciseLabel(now + 2)} starten`;
+    else if (now === total - 1) label.textContent = 'Training beenden';
     else label.textContent = 'Beendet';
     button.disabled = busy || (now !== null && now >= total);
     if (direction && Motion.full() && window.gsap) {
@@ -1116,6 +1131,7 @@ function exportPdf() {
 document.addEventListener('DOMContentLoaded', () => {
     render();
     if (!plan) return;
+    if (phoneFocusDefault()) openFocus();
     Motion.enter(document.querySelectorAll('.exercise'));
 
     $('undoBtn').addEventListener('click', undo);
@@ -1130,6 +1146,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('missingDialog').addEventListener('close', () => { attendance = null; });
     $('applyFrom').addEventListener('change', renderAttendance);
     $('addKidFrom').addEventListener('change', renderAddKid);
+    $('addKidStationsToggle').addEventListener('click', () => {
+        setAddKidStations(true);
+        Motion.enter([$('addKidStationsBlock')]);
+    });
     $('addKidFix').addEventListener('click', () => {
         if (!addKidFixAction) return;
         addKidFixAction();

@@ -7,7 +7,7 @@
     <title>Trainingsplan</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" th:href="@{/vendor/bootstrap-icons/icons.css(v=2)}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=22)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=23)}">
 </head>
 
 <body class="plan-page">
@@ -48,7 +48,7 @@
                 <button type="button" id="undoBtn" class="btn btn-secondary tool-icon" disabled aria-label="Rückgängig" title="Rückgängig">
                     <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> <span class="tool-label">Rückgängig</span></button>
                 <button type="button" id="nextBtn" class="btn btn-primary tool-main">
-                    <i class="bi bi-play-fill" aria-hidden="true"></i> <span id="nextLabel">Start</span></button>
+                    <i class="bi bi-play-fill" aria-hidden="true"></i> <span id="nextLabel">Übung 1 starten</span></button>
             </div>
             <p id="editWarn" class="summary edit-warn" role="status" hidden></p>
             <div id="editBar" class="button-row tools" hidden>
@@ -111,7 +111,11 @@
                     </div>
                 </div>
 
-                <div class="sub-block">
+                <p id="addKidStats" class="stats" style="margin-top: var(--space-4);"></p>
+                <button type="button" id="addKidFix" class="btn btn-secondary btn-block btn-wrap" style="margin-top: var(--space-2);" hidden></button>
+                <button type="button" id="addKidStationsToggle" class="btn btn-quiet" aria-expanded="false" aria-controls="addKidStationsBlock">
+                    <i class="bi bi-sliders" aria-hidden="true"></i> Stationen anpassen</button>
+                <div class="sub-block" id="addKidStationsBlock" hidden>
                     <span class="sub-title" id="addKidStationsTitle"><i class="bi bi-sliders" aria-hidden="true"></i> Stationen ab dieser Übung</span>
                     <ul id="addKidBuckets" class="bucket-list" aria-labelledby="addKidStationsTitle"></ul>
                     <button type="button" id="addKidAddBucket" class="btn btn-quiet">
@@ -124,8 +128,6 @@
                             <button type="button" class="btn" data-kid-step="1" aria-label="Ein Kind mehr beim Mentaltrainer">+</button>
                         </div>
                     </div>
-                    <p id="addKidStats" class="stats" style="margin-top: var(--space-3);"></p>
-                    <button type="button" id="addKidFix" class="btn btn-secondary btn-block btn-wrap" style="margin-top: var(--space-2);" hidden></button>
                 </div>
                 <p id="addKidError" class="notice notice-danger" role="alert" hidden style="margin-top: var(--space-3);"></p>
             </div>
@@ -149,7 +151,7 @@
             <button type="button" class="btn btn-secondary tool-icon focus-tool" id="focusLeave" aria-label="Wer geht?">
                 <i class="bi bi-person-dash" aria-hidden="true"></i><span aria-hidden="true">Geht</span></button>
             <button type="button" class="btn btn-secondary tool-icon focus-tool" id="focusJoin" aria-label="Kind kommt dazu">
-                <i class="bi bi-person-plus" aria-hidden="true"></i><span aria-hidden="true">Dazu</span></button>
+                <i class="bi bi-person-plus" aria-hidden="true"></i><span aria-hidden="true">Kommt dazu</span></button>
             <button type="button" class="btn btn-primary focus-next" id="focusAdvance">
                 <i class="bi bi-skip-end-fill" aria-hidden="true"></i> <span id="focusAdvanceLabel">Weiter</span></button>
         </div>
@@ -162,7 +164,7 @@
     <script th:src="@{/vendor/Flip.min.js}"></script>
     <script th:src="@{/js/motion.js(v=2)}"></script>
     <script th:src="@{/js/common.js(v=6)}"></script>
-    <script th:src="@{/js/plan.js(v=17)}"></script>
+    <script th:src="@{/js/plan.js(v=18)}"></script>
 </body>
 
 </html>

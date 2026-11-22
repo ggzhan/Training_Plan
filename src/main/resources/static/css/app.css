@@ -1922,17 +1922,7 @@ dialog.sheet-bottom[open] {
     margin-left: 2px;
 }
 
-/* Phones: the edit button keeps its icon, so the Übung badge fits next to the title */
-@media (max-width: 480px) {
-    .exercise-head .btn-label {
-        display: none;
-    }
 
-    .exercise-head .btn-quiet {
-        width: var(--tap);
-        padding: 0;
-    }
-}
 
 /* The empty-state line is text, not a list row */
 .bucket-list li.empty {
@@ -1964,15 +1954,9 @@ dialog.sheet-bottom[open] {
     color: var(--accent);
 }
 
-.exercise.is-now .edit-btn {
-    color: var(--on-accent);
-}
 
-@media (hover: hover) {
-    .exercise.is-now .edit-btn:not(:disabled):hover {
-        background: oklch(1 0 0 / 0.15);
-    }
-}
+
+
 
 /* Played and folded: one line with a check */
 .exercise.is-collapsed {
@@ -2144,13 +2128,10 @@ dialog.sheet-bottom[open] {
     grid-column: 1 / -1;
 }
 
-/* The legend stays in view while the kid list scrolls */
+/* The legend sits above the list with its own space; pinned, it covered the first row */
 .list-legend {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     padding: var(--space-2) 0;
-    background: var(--surface);
+    border-bottom: 1px solid var(--line);
 }
 
 /* Entry bar on phones: one line of numbers; words only while they fit */
@@ -2442,4 +2423,47 @@ dialog.focus-dialog::backdrop {
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.1;
+}
+
+/* Edit sits at the bottom of each card */
+.exercise .edit-btn {
+    margin-top: var(--space-3);
+}
+
+/* Jetzt-Ansicht footer: room for "Kommt dazu" */
+.focus-foot #focusJoin {
+    flex-basis: 84px;
+}
+
+.focus-foot #focusLeave {
+    flex-basis: 64px;
+}
+
+#addKidStationsToggle {
+    margin-top: var(--space-2);
+}
+
+/* "Übung 2 starten" must fit next to Geht and Kommt dazu */
+.focus-next {
+    min-width: 0;
+    font-size: 1.125rem;
+    white-space: normal;
+}
+
+@media (min-width: 600px) {
+    .focus-next {
+        font-size: 1.375rem;
+    }
+}
+
+.focus-foot .focus-tool {
+    padding: 0 var(--space-1);
+}
+
+@media (max-width: 599px) {
+    .focus-next {
+        font-size: 1.0625rem;
+        white-space: nowrap;
+        padding: 0 var(--space-3);
+    }
 }
