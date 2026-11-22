@@ -55,8 +55,13 @@ public class TrainingPlanService {
     private static final int REPEAT_PENALTY = 1_000_000;
     // Above any number of repeats, so "never together" is only broken when nothing else fits
     private static final int NEVER_TOGETHER_PENALTY = 50_000_000;
-    // Per earlier time a kid had a third player with them; outweighs any Elo gap
-    private static final int HOST_PENALTY = 5_000;
+    // Per earlier time a kid had a third player with them; outweighs any Elo gap,
+    // but never a repeated partner
+    private static final int HOST_PENALTY = 200_000;
+    // Per earlier pairing with a kid of the pair the odd kid would join. Below the
+    // hosting penalty: a trio with an earlier partner is fairer than one kid
+    // hosting the third again and again.
+    private static final int PARTNER_THIRD_PENALTY = 100_000;
     // Below this Elo saving for the pairs, nobody counts as standing out
     private static final int STRONG_MIN_GAIN = 50;
     // Caps the pairing search so a large group answers in well under a second
@@ -497,6 +502,8 @@ public class TrainingPlanService {
                 Player b = pair.getPlayer2();
                 long cost = Math.abs(kid.getElo() - (a.getElo() + b.getElo()) / 2)
                         + (long) REPEAT_PENALTY * (history.thirdWith(kid, a) + history.thirdWith(kid, b))
+                        // and not with someone it already played with as a pair
+                        + (long) PARTNER_THIRD_PENALTY * (history.meetings(kid, a) + history.meetings(kid, b))
                         // Spread the hosting too: a pair with a kid who already had a third waits its turn
                         + (long) HOST_PENALTY * (history.hosted(a) + history.hosted(b))
                         + (neverTogether.contains(History.pairKey(kid, a)) ? (long) NEVER_TOGETHER_PENALTY : 0)

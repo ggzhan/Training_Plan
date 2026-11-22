@@ -401,12 +401,20 @@ let pickedSlot = null;
 let swappedSlots = new Set(); // places changed in this edit, marked until saving
 
 function renderEditCard(index) {
-    let slot = 0;
-    const kid = (current, label) => {
-        const i = slot++;
+    // Slot numbers follow slotsOf (pairs, Mentaltrainer, Balleimer, sparring,
+    // unpaired); the layout follows the card (stations first, the third inside
+    // its pair), so the coach finds every kid where it was
+    const P = draft.pairs.length * 2;
+    const M = P + draft.mentalTrainer.length;
+    const bucketStart = [];
+    let next = M;
+    draft.balleimer.forEach(bucket => { bucketStart.push(next); next += bucket.length; });
+    const S = next;
+    const U = S + draft.sparring.length;
+    const kid = (current, label, i, extra = '') => {
         const picked = i === pickedSlot;
         const moved = swappedSlots.has(i) ? ' is-swapped' : '';
-        return `<button type="button" class="slot-btn${moved}" data-slot="${i}" aria-pressed="${picked}"`
+        return `<button type="button" class="slot-btn${moved}${extra}" data-slot="${i}" aria-pressed="${picked}"`
             + ` aria-label="${escapeHtml(label)}: ${escapeHtml(current.name)}">`
             + `<span class="slot-name" data-flip-id="${escapeHtml(current.name)}">${escapeHtml(current.name)}</span>`
             + `<span class="slot-elo">Elo ${current.elo}</span></button>`;
@@ -423,31 +431,33 @@ function renderEditCard(index) {
     const open = () => `role="group" aria-labelledby="grp-${index}-${group + 1}"`;
     const saved = plan.exercises[index].pairs;
     const wide = wideGap();
+
+    if (draft.mentalTrainer.length > 0) {
+        body += `<div class="slot-group row-mental" ${open()}>${tag('<i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer')}
+            ${draft.mentalTrainer.map((p, k) => kid(p, `Mentaltrainer, Kind ${k + 1}`, P + k)).join('')}</div>`;
+    }
+    draft.balleimer.forEach((bucket, b) => {
+        body += `<div class="slot-group row-bucket" ${open()}>${tag(`<i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}`)}
+            ${bucket.map((p, k) => kid(p, `Balleimer ${b + 1}, Kind ${k + 1}`, bucketStart[b] + k)).join('')}</div>`;
+    });
+    draft.sparring.forEach((sp, k) => {
+        body += `<div class="slot-group row-sparring" ${open()}>${tag(`<i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}`)}
+            ${kid(sp.player, `Sparring mit ${sp.partner}`, S + k)}</div>`;
+    });
+    draft.unpaired.forEach((p, k) => {
+        if (joinOf(draft, k) >= 0) return;
+        body += `<div class="slot-group" ${open()}>${tag('Ohne Partner')}${kid(p, 'Ohne Partner', U + k)}</div>`;
+    });
     draft.pairs.forEach((p, n) => {
         const gap = Math.abs(p.player1.elo - p.player2.elo);
         const before = saved[n] ? Math.abs(saved[n].player1.elo - saved[n].player2.elo) : gap;
         const text = before === gap ? `Elo-Abstand ${gap}` : `Elo-Abstand ${before} → ${gap}`;
         const cls = gap > wide ? ' is-wide' : '';
         const verdict = gap > wide ? ' – gross' : '';
+        const thirds = draft.unpaired.map((t, k) => joinOf(draft, k) === n
+            ? kid(t, `Paar ${n + 1}, als Dritter`, U + k, ' is-third') : '').join('');
         body += `<div class="slot-group slot-pair" ${open()}>${tag(`Paar ${n + 1} <span class="tag-note${cls}">${text}${verdict}</span>`)}
-            ${kid(p.player1, `Paar ${n + 1}, erstes Kind`)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
-    });
-    if (draft.mentalTrainer.length > 0) {
-        body += `<div class="slot-group row-mental" ${open()}>${tag('<i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer')}
-            ${draft.mentalTrainer.map((p, k) => kid(p, `Mentaltrainer, Kind ${k + 1}`)).join('')}</div>`;
-    }
-    draft.balleimer.forEach((bucket, b) => {
-        body += `<div class="slot-group row-bucket" ${open()}>${tag(`<i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}`)}
-            ${bucket.map((p, k) => kid(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;
-    });
-    draft.sparring.forEach(sp => {
-        body += `<div class="slot-group row-sparring" ${open()}>${tag(`<i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}`)}
-            ${kid(sp.player, `Sparring mit ${sp.partner}`)}</div>`;
-    });
-    draft.unpaired.forEach((p, k) => {
-        const join = joinOf(draft, k);
-        const label = join >= 0 ? `Dritter bei Paar ${join + 1}` : 'Ohne Partner';
-        body += `<div class="slot-group" ${open()}>${tag(label)}${kid(p, label)}</div>`;
+            ${kid(p.player1, `Paar ${n + 1}, erstes Kind`, 2 * n)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`, 2 * n + 1)}${thirds}</div>`;
     });
     body += hintsHtml(index, draft);
     if (index + 1 < total) {
@@ -722,6 +732,8 @@ function replan(nextPlan, keepThrough) {
         .finally(() => {
             busy = false;
             renderBar();
+            // The Jetzt-Ansicht drew while busy; enable its buttons again
+            if (focusOpen()) renderFocus();
         });
 }
 
@@ -1026,6 +1038,8 @@ function openFocus() {
     const now = nowIndex();
     focusIndex = now === null ? 0 : Math.min(now, plan.exercises.length - 1);
     renderFocus();
+    // Toasts (with their Rückgängig) must show above the full-screen view
+    $('focusDialog').appendChild($('toast'));
     Motion.openDialog($('focusDialog'));
 }
 
@@ -1036,7 +1050,9 @@ function renderFocus(direction = 0) {
     const ex = plan.exercises[focusIndex];
     const state = focusIndex === now ? 'Jetzt' : isPlayed(focusIndex) ? 'gespielt'
         : now !== null && focusIndex === now + 1 ? 'als Nächstes' : '';
-    $('focusTitle').innerHTML = `${exerciseLabel(focusIndex + 1)}${state ? ` <span class="ex-badge${focusIndex === now ? ' is-now' : ''}">${state}</span>` : ''}`;
+    $('focusTitle').innerHTML = `<span>${exerciseLabel(focusIndex + 1)}<span class="focus-of"> / ${total}</span></span>`
+        + `${state ? ` <span class="ex-badge${focusIndex === now ? ' is-now' : ''}">${state}</span>` : ''}`;
+    $('focusUndo').disabled = historyStack.length === 0 || busy;
     $('focusDialog').classList.toggle('is-now', focusIndex === now);
     const body = $('focusBody');
     body.innerHTML = cardBody(ex, focusIndex);
@@ -1074,6 +1090,13 @@ function advanceFromFocus() {
 function wireFocus() {
     $('focusBtn').addEventListener('click', openFocus);
     $('focusClose').addEventListener('click', () => Motion.closeDialog($('focusDialog')));
+    $('focusDialog').addEventListener('close', () => document.body.appendChild($('toast')));
+    $('focusUndo').addEventListener('click', () => {
+        undo();
+        const now = nowIndex();
+        focusIndex = now === null ? 0 : Math.min(now, plan.exercises.length - 1);
+        renderFocus(-1);
+    });
     $('focusPrev').addEventListener('click', () => browseFocus(-1));
     $('focusNext').addEventListener('click', () => browseFocus(1));
     $('focusAdvance').addEventListener('click', advanceFromFocus);

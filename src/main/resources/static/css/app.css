@@ -2467,3 +2467,19 @@ dialog.focus-dialog::backdrop {
         padding: 0 var(--space-3);
     }
 }
+
+/* Edit mode: the third kid sits inside its pair, across the full width */
+.slot-group.slot-pair .slot-btn.is-third {
+    grid-column: 1 / -1;
+}
+
+/* Jetzt-Ansicht: position and toasts above the footer */
+.focus-of {
+    font-size: 1rem;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.focus-dialog .toast-host {
+    bottom: calc(104px + env(safe-area-inset-bottom));
+}

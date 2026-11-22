@@ -145,6 +145,29 @@ class TrainingPlanServiceTest {
     }
 
     @Test
+    void theOddKidAvoidsEarlierPartners() {
+        // With 9 kids over 6 Übungen most kids have played each other by the end,
+        // so some trios with an earlier partner are unavoidable. Measured: 61 of
+        // these over 20 plans without the partner penalty, 45 with it.
+        List<Player> players = kids(9);
+        int repeats = 0;
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(6, 0, 2));
+            Set<String> partners = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                String kid = round.getUnpaired().get(0).getName();
+                PlayerPair pair = round.getPairs().get(round.joinOf(0));
+                for (Player mate : List.of(pair.getPlayer1(), pair.getPlayer2())) {
+                    String key = kid.compareTo(mate.getName()) < 0 ? kid + "|" + mate.getName() : mate.getName() + "|" + kid;
+                    if (partners.contains(key)) repeats++;
+                }
+                round.getPairs().forEach(p -> partners.add(pairKey(p)));
+            }
+        }
+        assertTrue(repeats <= 50, repeats + " trios with an earlier partner over 20 plans");
+    }
+
+    @Test
     void hostingTheThirdRotates() {
         List<Player> players = kids(9);
         for (long seed = 0; seed < 20; seed++) {

@@ -132,8 +132,8 @@ function renderPlayerList() {
 function ruleTags(starred, noBucket, noSpar) {
     const tags = [];
     if (starred) tags.push('<span class="rule-tag is-star">⭐ öfter</span>');
-    if (noBucket) tags.push('<span class="rule-tag is-off">kein Balleimer</span>');
-    if (noSpar) tags.push('<span class="rule-tag is-off">kein Sparring</span>');
+    if (noBucket) tags.push('<span class="rule-tag is-off">nie Balleimer</span>');
+    if (noSpar) tags.push('<span class="rule-tag is-off">nie Sparring</span>');
     return tags.join('');
 }
 
@@ -255,6 +255,8 @@ function currentSettings() {
         neverTogether
     };
 }
+
+let lastMental = 2;
 
 function settingsChanged() {
     writeStored(STORAGE_KEYS.settings, currentSettings());
@@ -532,9 +534,9 @@ function renderRules() {
         const item = document.createElement('li');
         item.className = here.has(name) ? '' : 'is-away';
         const parts = [];
-        if (extraStationKids.includes(name)) parts.push('⭐ mehr Stationen');
-        if (noBalleimer.includes(name)) parts.push('kein Balleimer');
-        if (noSparring.includes(name)) parts.push('kein Sparring');
+        if (extraStationKids.includes(name)) parts.push('⭐ öfter an Stationen');
+        if (noBalleimer.includes(name)) parts.push('nie Balleimer');
+        if (noSparring.includes(name)) parts.push('nie Sparring');
         item.innerHTML = `<span>${escapeHtml(name)}</span>
             <span class="ex-text">${parts.join(', ')}</span>
             <button type="button" class="btn btn-icon btn-quiet btn-danger-quiet"
@@ -573,10 +575,15 @@ function renderRules() {
     $('neverA').value = here.has(a) ? a : '';
     $('neverB').value = here.has(b) ? b : '';
 
-    const count = (stationPriority !== 'random' ? 1 : 0) + (strongAtStations ? 1 : 0)
-        + excepted.filter(n => here.has(n)).length
-        + neverTogether.filter(pair => pair.every(n => here.has(n))).length;
-    $('rulesSummary').textContent = count === 0 ? 'Keine' : `${count} aktiv`;
+    // Say what is set, not a bare count
+    const exceptionCount = excepted.filter(n => here.has(n)).length;
+    const pairCount = neverTogether.filter(pair => pair.every(n => here.has(n))).length;
+    const parts = [];
+    if (exceptionCount > 0) parts.push(`${exceptionCount} ${exceptionCount === 1 ? 'Ausnahme' : 'Ausnahmen'}`);
+    if (pairCount > 0) parts.push(`${pairCount}× nie zusammen`);
+    if (strongAtStations) parts.push('Starke öfter');
+    if (stationPriority !== 'random') parts.push(stationPriority === 'weaker' ? 'Schwächere zuerst' : 'Stärkere zuerst');
+    $('rulesSummary').textContent = parts.length === 0 ? 'Keine' : parts.join(' · ');
 }
 
 // Tapping the Balleimer or sparring icon in a kid's row switches that station off
@@ -684,6 +691,10 @@ function checkStations() {
     const clash = sparringPartners.find(name => kidNames.has(name));
     const length = Math.max(1, intValue('mentalTrainerLength'));
     const picked = mentalPicks.filter(name => kidNames.has(name)).length;
+    // The switch says on/off; the numbers only show while it is on
+    $('mentalOn').checked = mental > 0;
+    $('mentalSettings').hidden = mental === 0;
+    if (mental > 0) lastMental = mental;
     // One short line: how many, and for how long
     $('mentalSummary').textContent = mental === 0
         ? 'Aus'
@@ -865,6 +876,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const open = $('toggleMental').getAttribute('aria-expanded') !== 'true';
         setMentalOpen(open);
         writeStored(MENTAL_OPEN_KEY, open);
+    });
+    $('mentalOn').addEventListener('change', () => {
+        $('mentalTrainerKids').value = $('mentalOn').checked ? lastMental : 0;
+        settingsChanged();
+        if ($('mentalOn').checked) Motion.enter([$('mentalSettings')]);
     });
     ['numberOfExercises', 'mentalTrainerKids', 'mentalTrainerLength'].forEach(id =>
         $(id).addEventListener('input', settingsChanged));
