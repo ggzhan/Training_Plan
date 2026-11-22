@@ -108,11 +108,11 @@ function renderPlayerList() {
             <button type="button" class="btn btn-icon star-toggle" aria-pressed="${starred}"
                 aria-label="Mehr Stationen für ${name}" title="${starred ? 'Mehr Stationen' : 'Normal'}">
                 <i class="bi ${starred ? 'bi-star-fill' : 'bi-star'}" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${noBucket}"
-                aria-label="Kein Balleimer für ${name}" title="${noBucket ? 'Kein Balleimer' : 'Balleimer erlaubt'}">
+            <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${!noBucket}"
+                aria-label="Balleimer erlaubt für ${name}" title="${noBucket ? 'Kein Balleimer' : 'Balleimer erlaubt'}">
                 <i class="bi bi-basket" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${noSpar}"
-                aria-label="Kein Sparring für ${name}" title="${noSpar ? 'Kein Sparring' : 'Sparring erlaubt'}">
+            <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${!noSpar}"
+                aria-label="Sparring erlaubt für ${name}" title="${noSpar ? 'Kein Sparring' : 'Sparring erlaubt'}">
                 <i class="bi bi-person-badge" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-icon btn-quiet" aria-label="${name} bearbeiten oder entfernen">
                 <i class="bi bi-pencil" aria-hidden="true"></i></button>`;
@@ -588,12 +588,7 @@ function toggleException(list, name) {
     if (on) names.push(name);
     else names.splice(names.indexOf(name), 1);
     rulesChanged();
-    const messages = {
-        noBalleimer: [`${name}: kein Balleimer`, `${name}: Balleimer wieder erlaubt`],
-        noSparring: [`${name}: kein Sparring`, `${name}: Sparring wieder erlaubt`],
-        extraStationKids: [`${name}: mehr Stationen`, `${name}: normal`]
-    };
-    toast(messages[list][on ? 0 : 1]);
+    // No toast: the row's tag shows the change, and aria-pressed announces it
     // Keep keyboard focus on the button that was tapped
     const selector = { noBalleimer: '.station-toggle.is-bucket', noSparring: '.station-toggle.is-sparring',
         extraStationKids: '.star-toggle' }[list];
@@ -734,7 +729,8 @@ function checkStations() {
 // How the Balleimer and sparring turns spread over today's kids
 function renderStationResult(places, kids, warnings = []) {
     const line = $('stationResult');
-    line.hidden = places === 0 || kids === 0;
+    // The bar stays one line: the rotation detail only comes up with a warning
+    line.hidden = places === 0 || kids === 0 || warnings.length === 0;
     if (line.hidden) return;
     const each = Math.floor(places / kids);
     const extra = places % kids;

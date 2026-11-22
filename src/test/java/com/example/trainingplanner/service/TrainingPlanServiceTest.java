@@ -125,6 +125,51 @@ class TrainingPlanServiceTest {
     }
 
     @Test
+    void theOddKidJoinsAPairAndNeverTheSameTwice() {
+        List<Player> players = kids(9);
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(6, 0, 2));
+            Set<String> thirds = new HashSet<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                assertEquals(1, round.getJoins().size());
+                int join = round.joinOf(0);
+                assertTrue(join >= 0, "odd kid has no pair to join");
+                PlayerPair pair = round.getPairs().get(join);
+                String kid = round.getUnpaired().get(0).getName();
+                for (Player mate : List.of(pair.getPlayer1(), pair.getPlayer2())) {
+                    String key = kid.compareTo(mate.getName()) < 0 ? kid + "|" + mate.getName() : mate.getName() + "|" + kid;
+                    assertTrue(thirds.add(key), kid + " joins " + mate.getName() + " twice");
+                }
+            }
+        }
+    }
+
+    @Test
+    void hostingTheThirdRotates() {
+        List<Player> players = kids(9);
+        for (long seed = 0; seed < 20; seed++) {
+            TrainingPlan plan = generate(seed, players, settings(6, 0, 2));
+            java.util.Map<String, Integer> hosted = new java.util.HashMap<>();
+            for (ExerciseRound round : plan.getExercises()) {
+                PlayerPair pair = round.getPairs().get(round.joinOf(0));
+                hosted.merge(pair.getPlayer1().getName(), 1, Integer::sum);
+                hosted.merge(pair.getPlayer2().getName(), 1, Integer::sum);
+            }
+            // Pairs are fixed by the matching, so a repeat can be unavoidable, but nobody keeps hosting
+            assertTrue(hosted.values().stream().allMatch(n -> n <= 3), "a kid hosts too often: " + hosted);
+        }
+    }
+
+    @Test
+    void aLoneKidWithNoPairsHasNothingToJoin() {
+        TrainingPlan plan = generate(1, kids(3), settings(2, 1, 2));
+        for (ExerciseRound round : plan.getExercises()) {
+            assertEquals(1, round.getUnpaired().size());
+            assertEquals(-1, round.joinOf(0));
+        }
+    }
+
+    @Test
     void firstExercisePairsKidsOfTheSameLevel() {
         List<Player> players = List.of(new Player("A", 1), new Player("B", 12), new Player("C", 1),
                 new Player("D", 12), new Player("E", 6), new Player("F", 6));

@@ -196,7 +196,7 @@ function hintsFor(index, ex) {
         });
         const earlierUnpaired = new Set(earlier.unpaired.map(p => p.name));
         ex.unpaired.forEach(p => {
-            if (earlierUnpaired.has(p.name)) add('warn', `${p.name} war schon in ${label} ohne Partner.`);
+            if (earlierUnpaired.has(p.name)) add('warn', `${p.name} war schon in ${label} ohne eigenen Partner.`);
         });
     }
     return hints;
@@ -257,7 +257,7 @@ function renderNav() {
     nav.innerHTML = '<span class="exnav-indicator" aria-hidden="true"></span>' + plan.exercises.map((_, i) => {
         const state = i === now ? ' is-now' : isPlayed(i) ? ' is-played' : '';
         const note = i === now ? ', läuft jetzt' : isPlayed(i) ? ', gespielt' : '';
-        const here = i === currentIndex ? ' is-here' : '';
+        const here = (i === currentIndex ? ' is-here' : '') + (i === editingIndex ? ' is-editing' : '');
         return `<a href="#ex-${i + 1}" class="${(state + here).trim()}" aria-label="${exerciseLabel(i + 1)}${note}"`
             + `${i === now ? ' aria-current="step"' : ''}>${i + 1}</a>`;
     }).join('');
@@ -289,6 +289,12 @@ function names(players, index) {
     return players.map((p, i) => who(p.name, index, i < players.length - 1 ? ',' : '')).join(' ');
 }
 
+// Index of the pair an unpaired kid joins, or -1
+function joinOf(ex, unpairedIndex) {
+    const join = (ex.joins || [])[unpairedIndex];
+    return Number.isInteger(join) && join >= 0 && join < ex.pairs.length ? join : -1;
+}
+
 // Played Übungen fold to one line during the training; tap to look back
 const openPlayed = new Set();
 
@@ -304,9 +310,12 @@ function renderViewCard(ex, index) {
 
     let body = '';
     if (ex.pairs.length > 0) {
+        // A kid without a partner plays as the third with the pair the planner chose
+        const thirds = (pairIndex) => ex.unpaired.filter((_, u) => joinOf(ex, u) === pairIndex)
+            .map(k => `<span class="amp">+</span>${who(k.name, index)}<span class="third-note">als Dritter</span>`).join('');
         body += `<h3 class="group-label">Paare</h3><ul class="rows">`
-            + ex.pairs.map(p => `<li class="row">${who(p.player1.name, index)}`
-                + `<span class="amp">&amp;</span>${who(p.player2.name, index)}</li>`).join('')
+            + ex.pairs.map((p, i) => `<li class="row">${who(p.player1.name, index)}`
+                + `<span class="amp">&amp;</span>${who(p.player2.name, index)}${thirds(i)}</li>`).join('')
             + '</ul>';
     }
     // Stations: label in its own column, names beside it
@@ -322,10 +331,11 @@ function renderViewCard(ex, index) {
         `<i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}`, names(bucket, index))));
     ex.sparring.forEach(sp => stations.push(station('row-sparring',
         `<i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}`, who(sp.player.name, index))));
-    if (ex.unpaired.length > 0) {
-        // Not a leftover: say what the kid does
+    const alone = ex.unpaired.filter((_, u) => joinOf(ex, u) < 0);
+    if (alone.length > 0) {
+        // Only when there is no pair to join (older plans, or no pairs at all)
         stations.push(station('row-pause', 'Ohne Partner',
-            `${names(ex.unpaired, index)} <span class="row-note">spielt als Dritter bei einem Paar mit</span>`));
+            `${names(alone, index)} <span class="row-note">spielt als Dritter bei einem Paar mit</span>`));
     }
     if (stations.length > 0) {
         body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
@@ -340,7 +350,6 @@ function renderViewCard(ex, index) {
             <h2 id="ex-title-${index + 1}"><button type="button" class="played-toggle" aria-expanded="${open}" aria-controls="ex-body-${index + 1}">
                 <i class="bi bi-check2" aria-hidden="true"></i> ${exerciseLabel(index + 1)} <span class="played-note">gespielt</span>
                 <i class="bi bi-chevron-down" aria-hidden="true"></i></button></h2>
-            ${open ? editBtn : ''}
         </div>${open ? `<div id="ex-body-${index + 1}">${body}</div>` : ''}`;
         section.querySelector('.played-toggle').addEventListener('click', () => togglePlayed(index));
     } else {
@@ -382,7 +391,7 @@ function renderEditCard(index) {
         return `<button type="button" class="slot-btn${moved}" data-slot="${i}" aria-pressed="${picked}"`
             + ` aria-label="${escapeHtml(label)}: ${escapeHtml(current.name)}">`
             + `<span class="slot-name" data-flip-id="${escapeHtml(current.name)}">${escapeHtml(current.name)}</span>`
-            + `<span class="slot-elo">${current.elo}</span></button>`;
+            + `<span class="slot-elo">Elo ${current.elo}</span></button>`;
     };
 
     const total = plan.exercises.length;
@@ -391,26 +400,31 @@ function renderEditCard(index) {
         : 'Jetzt das Kind antippen, mit dem getauscht wird.';
     let body = `<p class="info edit-hint" id="editHint">${hint}</p>`;
     let regenBlock = '';
+    let group = 0;
+    const tag = (html) => { group++; return `<span class="tag" id="grp-${index}-${group}">${html}</span>`; };
+    const open = () => `role="group" aria-labelledby="grp-${index}-${group + 1}"`;
     draft.pairs.forEach((p, n) => {
-        body += `<div class="slot-group slot-pair"><span class="tag">Paar ${n + 1}</span>
+        const gap = Math.abs(p.player1.elo - p.player2.elo);
+        body += `<div class="slot-group slot-pair" ${open()}>${tag(`Paar ${n + 1} <span class="tag-note">Elo-Abstand ${gap}</span>`)}
             ${kid(p.player1, `Paar ${n + 1}, erstes Kind`)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
     });
     if (draft.mentalTrainer.length > 0) {
-        body += `<div class="slot-group row-mental"><span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer</span>
+        body += `<div class="slot-group row-mental" ${open()}>${tag('<i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer')}
             ${draft.mentalTrainer.map((p, k) => kid(p, `Mentaltrainer, Kind ${k + 1}`)).join('')}</div>`;
     }
     draft.balleimer.forEach((bucket, b) => {
-        body += `<div class="slot-group row-bucket"><span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span>
+        body += `<div class="slot-group row-bucket" ${open()}>${tag(`<i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}`)}
             ${bucket.map((p, k) => kid(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;
     });
     draft.sparring.forEach(sp => {
-        body += `<div class="slot-group row-sparring"><span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
+        body += `<div class="slot-group row-sparring" ${open()}>${tag(`<i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}`)}
             ${kid(sp.player, `Sparring mit ${sp.partner}`)}</div>`;
     });
-    if (draft.unpaired.length > 0) {
-        body += `<div class="slot-group"><span class="tag">Ohne Partner</span>
-            ${draft.unpaired.map((p, k) => kid(p, `Ohne Partner, Kind ${k + 1}`)).join('')}</div>`;
-    }
+    draft.unpaired.forEach((p, k) => {
+        const join = joinOf(draft, k);
+        const label = join >= 0 ? `Dritter bei Paar ${join + 1}` : 'Ohne Partner';
+        body += `<div class="slot-group" ${open()}>${tag(label)}${kid(p, label)}</div>`;
+    });
     body += hintsHtml(index, draft);
     if (index + 1 < total) {
         const rest = index + 2 === total ? `Übung ${total}` : `Übungen ${index + 2}–${total}`;
@@ -462,9 +476,24 @@ function tapSlot(slotIndex) {
     announce(`${a.name} und ${b.name} getauscht`);
 }
 
+// Repeat and rule warnings of the edited Übung sit right above Speichern
+function renderEditWarn() {
+    const warn = $('editWarn');
+    if (editingIndex === null) {
+        warn.hidden = true;
+        return;
+    }
+    const serious = hintsFor(editingIndex, draft).filter(h => h.level !== 'note');
+    warn.hidden = serious.length === 0;
+    warn.className = 'summary edit-warn' + (serious.some(h => h.level === 'rule') ? ' is-error' : ' is-warning');
+    warn.innerHTML = serious.slice(0, 2).map(h => `<i class="bi bi-exclamation-triangle" aria-hidden="true"></i> ${escapeHtml(h.text)}`).join('<br>')
+        + (serious.length > 2 ? ` <span>(+${serious.length - 2})</span>` : '');
+}
+
 function rerenderEdit(focusSlot) {
     const old = $(`ex-${editingIndex + 1}`);
     old.replaceWith(renderEditCard(editingIndex));
+    renderEditWarn();
     const again = document.querySelector(`.slot-btn[data-slot="${focusSlot}"]`);
     if (again) again.focus({ preventScroll: true });
 }
@@ -482,6 +511,8 @@ function renderBar() {
     const switched = $('editBar').hidden === editing;
     $('viewBar').hidden = editing;
     $('editBar').hidden = !editing;
+    renderEditWarn();
+    renderNav();
     if (switched) Motion.enter([editing ? $('editBar') : $('viewBar')]);
     $('undoBtn').disabled = historyStack.length === 0 || busy;
     $('missingBtn').disabled = busy;
@@ -663,7 +694,7 @@ function replan(nextPlan, keepThrough) {
 // " · 1 ohne Partner" when the re-planned Übungen leave someone alone
 function unpairedNote(fromIndex) {
     const alone = plan.exercises.slice(Math.max(0, fromIndex)).some(ex => ex.unpaired.length > 0);
-    return alone ? ' · 1 Kind ohne Partner' : '';
+    return alone ? ' · 1 Kind spielt als Dritter' : '';
 }
 
 function regenerateFollowing() {
@@ -753,7 +784,7 @@ function renderAttendance() {
         const before = plan.players.length - (plan.settings.balleimerSizes || []).reduce((sum, size) => sum + size, 0)
             - plan.settings.sparringPartners.length - (plan.settings.mentalTrainerKids || 0);
         const already = before % 2 === 1;
-        odd.textContent = already ? 'Schon jetzt bleibt pro Übung 1 Kind ohne Partner.' : 'Dann bleibt pro Übung 1 Kind ohne Partner.';
+        odd.textContent = already ? 'Schon jetzt spielt pro Übung 1 Kind als Dritter mit.' : 'Dann spielt pro Übung 1 Kind als Dritter mit.';
         odd.classList.toggle('is-warn', !already);
     }
     odd.hidden = playing >= 0 && playing % 2 === 0;

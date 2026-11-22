@@ -55,6 +55,8 @@ public class TrainingPlanService {
     private static final int REPEAT_PENALTY = 1_000_000;
     // Above any number of repeats, so "never together" is only broken when nothing else fits
     private static final int NEVER_TOGETHER_PENALTY = 50_000_000;
+    // Per earlier time a kid had a third player with them; outweighs any Elo gap
+    private static final int HOST_PENALTY = 5_000;
     // Below this Elo saving for the pairs, nobody counts as standing out
     private static final int STRONG_MIN_GAIN = 50;
     // Caps the pairing search so a large group answers in well under a second
@@ -476,6 +478,36 @@ public class TrainingPlanService {
                 round.getPairs().add(new PlayerPair(a, b));
             }
         }
+        assignThirds(round, history, neverTogether);
+    }
+
+    /**
+     * A kid without a partner plays as the third player with one pair: the pair
+     * closest in Elo, preferring kids it has not played with as a third before,
+     * and never with someone it must not play with.
+     */
+    private void assignThirds(ExerciseRound round, History history, Set<String> neverTogether) {
+        round.getJoins().clear();
+        for (Player kid : round.getUnpaired()) {
+            int best = -1;
+            long bestCost = Long.MAX_VALUE;
+            for (int p = 0; p < round.getPairs().size(); p++) {
+                PlayerPair pair = round.getPairs().get(p);
+                Player a = pair.getPlayer1();
+                Player b = pair.getPlayer2();
+                long cost = Math.abs(kid.getElo() - (a.getElo() + b.getElo()) / 2)
+                        + (long) REPEAT_PENALTY * (history.thirdWith(kid, a) + history.thirdWith(kid, b))
+                        // Spread the hosting too: a pair with a kid who already had a third waits its turn
+                        + (long) HOST_PENALTY * (history.hosted(a) + history.hosted(b))
+                        + (neverTogether.contains(History.pairKey(kid, a)) ? (long) NEVER_TOGETHER_PENALTY : 0)
+                        + (neverTogether.contains(History.pairKey(kid, b)) ? (long) NEVER_TOGETHER_PENALTY : 0);
+                if (cost < bestCost) {
+                    bestCost = cost;
+                    best = p;
+                }
+            }
+            round.getJoins().add(best);
+        }
     }
 
     private static final class Matcher {
@@ -633,6 +665,8 @@ public class TrainingPlanService {
         private final Map<String, Integer> balleimer = new HashMap<>();
         private final Map<String, Integer> meetings = new HashMap<>();
         private final Map<String, Integer> sitOuts = new HashMap<>();
+        private final Map<String, Integer> thirds = new HashMap<>();
+        private final Map<String, Integer> hosts = new HashMap<>();
         private final Set<String> sparringPairs = new HashSet<>();
         private final Map<String, Integer> sparringCount = new HashMap<>();
 
@@ -651,8 +685,17 @@ public class TrainingPlanService {
             for (PlayerPair pair : round.getPairs()) {
                 meetings.merge(pairKey(pair.getPlayer1(), pair.getPlayer2()), 1, Integer::sum);
             }
-            for (Player p : round.getUnpaired()) {
+            for (int u = 0; u < round.getUnpaired().size(); u++) {
+                Player p = round.getUnpaired().get(u);
                 sitOuts.merge(p.getName(), 1, Integer::sum);
+                int join = round.joinOf(u);
+                if (join >= 0) {
+                    PlayerPair pair = round.getPairs().get(join);
+                    thirds.merge(pairKey(p, pair.getPlayer1()), 1, Integer::sum);
+                    thirds.merge(pairKey(p, pair.getPlayer2()), 1, Integer::sum);
+                    hosts.merge(pair.getPlayer1().getName(), 1, Integer::sum);
+                    hosts.merge(pair.getPlayer2().getName(), 1, Integer::sum);
+                }
             }
             for (SparringAssignment s : round.getSparring()) {
                 sparringPairs.add(s.getPartner() + "\u0000" + s.getPlayer().getName());
@@ -670,6 +713,14 @@ public class TrainingPlanService {
 
         int sitOuts(Player p) {
             return sitOuts.getOrDefault(p.getName(), 0);
+        }
+
+        int hosted(Player p) {
+            return hosts.getOrDefault(p.getName(), 0);
+        }
+
+        int thirdWith(Player kid, Player other) {
+            return thirds.getOrDefault(pairKey(kid, other), 0);
         }
 
         boolean sparredWith(String partner, Player p) {

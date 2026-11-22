@@ -72,9 +72,15 @@ public class PdfExportService {
                 int cols = pairs.size() <= 2 ? 2 : 3;
                 PdfPTable pairsTable = new PdfPTable(cols);
                 pairsTable.setWidthPercentage(100);
-                for (PlayerPair pair : pairs) {
-                    pairsTable.addCell(cell(new Phrase(
-                            pair.getPlayer1().getName() + " & " + pair.getPlayer2().getName(), PAIR_FONT), LIGHT_BG));
+                for (int p = 0; p < pairs.size(); p++) {
+                    PlayerPair pair = pairs.get(p);
+                    StringBuilder text = new StringBuilder(pair.getPlayer1().getName() + " & " + pair.getPlayer2().getName());
+                    for (int u = 0; u < exercise.getUnpaired().size(); u++) {
+                        if (exercise.joinOf(u) == p) {
+                            text.append(" + ").append(exercise.getUnpaired().get(u).getName());
+                        }
+                    }
+                    pairsTable.addCell(cell(new Phrase(text.toString(), PAIR_FONT), LIGHT_BG));
                 }
                 int remaining = cols - (pairs.size() % cols);
                 if (remaining < cols) {
@@ -115,9 +121,16 @@ public class PdfExportService {
                 document.add(row(phrase, SPARRING_BG));
             }
 
+            // Only kids with no pair to join still get their own line
             List<Player> unpaired = exercise.getUnpaired();
-            if (unpaired != null && !unpaired.isEmpty()) {
-                document.add(row(new Phrase("Ohne Partner: " + names(unpaired), UNPAIRED_FONT), UNPAIRED_BG));
+            List<Player> alone = new java.util.ArrayList<>();
+            for (int u = 0; unpaired != null && u < unpaired.size(); u++) {
+                if (exercise.joinOf(u) < 0) {
+                    alone.add(unpaired.get(u));
+                }
+            }
+            if (!alone.isEmpty()) {
+                document.add(row(new Phrase("Ohne Partner: " + names(alone), UNPAIRED_FONT), UNPAIRED_BG));
             }
         }
 
