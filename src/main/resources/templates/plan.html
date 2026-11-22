@@ -6,14 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Trainingsplan</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
-    <link rel="stylesheet" th:href="@{/vendor/bootstrap-icons/icons.css(v=1)}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=20)}">
+    <link rel="stylesheet" th:href="@{/vendor/bootstrap-icons/icons.css(v=2)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=22)}">
 </head>
 
 <body class="plan-page">
     <header class="topbar topbar-plan">
         <h1 id="planTitle">Trainingsplan</h1>
         <div class="head-actions">
+            <button type="button" id="focusBtn" class="btn btn-quiet btn-icon" aria-label="Jetzt-Ansicht: nur die laufende Übung, gross"
+                title="Jetzt-Ansicht" hidden><i class="bi bi-arrows-fullscreen" aria-hidden="true"></i></button>
             <button type="button" id="pdfBtn" class="btn btn-quiet btn-icon" aria-label="Plan als PDF herunterladen"
                 title="PDF herunterladen" hidden><i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i></button>
             <a href="/" class="btn btn-quiet">Neuer Plan</a>
@@ -40,11 +42,11 @@
             <div id="viewBar" class="button-row tools">
                 <button type="button" id="missingBtn" class="btn btn-secondary">
                     <i class="bi bi-person-dash" aria-hidden="true"></i>
-                    <span>Fehlt<span id="absentBadge" class="tool-badge" hidden></span></span></button>
+                    <span>Geht<span id="absentBadge" class="tool-badge" hidden></span></span></button>
                 <button type="button" id="addKidBtn" class="btn btn-secondary">
                     <i class="bi bi-person-plus" aria-hidden="true"></i> <span>Kommt dazu</span></button>
-                <button type="button" id="undoBtn" class="btn btn-secondary" disabled>
-                    <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> <span>Rückgängig</span></button>
+                <button type="button" id="undoBtn" class="btn btn-secondary tool-icon" disabled aria-label="Rückgängig" title="Rückgängig">
+                    <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> <span class="tool-label">Rückgängig</span></button>
                 <button type="button" id="nextBtn" class="btn btn-primary tool-main">
                     <i class="bi bi-play-fill" aria-hidden="true"></i> <span id="nextLabel">Start</span></button>
             </div>
@@ -61,14 +63,14 @@
     <!-- Wer fehlt? Opens from the bottom; the "ab Übung" choice and its button stay in reach -->
     <dialog id="missingDialog" class="sheet sheet-bottom" aria-labelledby="missingTitle">
         <div class="sheet-head">
-            <h2 id="missingTitle"><i class="bi bi-person-dash" aria-hidden="true"></i> Wer fehlt?
-                <span id="presentCount" class="count" title="anwesend">0</span></h2>
+            <h2 id="missingTitle"><i class="bi bi-person-dash" aria-hidden="true"></i> Wer geht?</h2>
             <button type="button" class="btn btn-icon btn-quiet" id="closeMissing" aria-label="Schliessen">
                 <i class="bi bi-x-lg" aria-hidden="true"></i>
             </button>
         </div>
         <div class="sheet-body sheet-scroll">
-            <p class="info">Antippen = fehlt. Nochmals antippen = wieder da.</p>
+            <p class="info">Antippen = geht. Nochmals antippen = bleibt.</p>
+            <p class="sheet-count" id="presentCount"></p>
             <div id="attendanceChips" class="chips" role="group" aria-label="Kinder"></div>
         </div>
         <div class="sheet-foot sheet-foot-stack">
@@ -134,6 +136,25 @@
         </form>
     </dialog>
 
+    <!-- Jetzt-Ansicht: only the running Übung, big, for a glance between drills -->
+    <dialog id="focusDialog" class="focus-dialog" aria-labelledby="focusTitle">
+        <div class="focus-head">
+            <button type="button" class="btn btn-icon focus-nav" id="focusPrev" aria-label="Vorherige Übung"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+            <h2 id="focusTitle" aria-live="polite"></h2>
+            <button type="button" class="btn btn-icon focus-nav" id="focusNext" aria-label="Nächste Übung"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-icon focus-close" id="focusClose" aria-label="Jetzt-Ansicht schliessen"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        </div>
+        <div class="focus-body" id="focusBody"></div>
+        <div class="focus-foot">
+            <button type="button" class="btn btn-secondary tool-icon focus-tool" id="focusLeave" aria-label="Wer geht?">
+                <i class="bi bi-person-dash" aria-hidden="true"></i><span aria-hidden="true">Geht</span></button>
+            <button type="button" class="btn btn-secondary tool-icon focus-tool" id="focusJoin" aria-label="Kind kommt dazu">
+                <i class="bi bi-person-plus" aria-hidden="true"></i><span aria-hidden="true">Dazu</span></button>
+            <button type="button" class="btn btn-primary focus-next" id="focusAdvance">
+                <i class="bi bi-skip-end-fill" aria-hidden="true"></i> <span id="focusAdvanceLabel">Weiter</span></button>
+        </div>
+    </dialog>
+
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
     <p id="srStatus" class="visually-hidden" role="status" aria-live="polite"></p>
 
@@ -141,7 +162,7 @@
     <script th:src="@{/vendor/Flip.min.js}"></script>
     <script th:src="@{/js/motion.js(v=2)}"></script>
     <script th:src="@{/js/common.js(v=6)}"></script>
-    <script th:src="@{/js/plan.js(v=15)}"></script>
+    <script th:src="@{/js/plan.js(v=17)}"></script>
 </body>
 
 </html>

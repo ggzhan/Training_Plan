@@ -1,8 +1,8 @@
-/* Bootstrap Icons 1.11.0 (MIT), subset by tools/subset-icons.py: 43 icons */
+/* Bootstrap Icons 1.11.0 (MIT), subset by tools/subset-icons.py: 46 icons */
 @font-face {
     font-display: block;
     font-family: "bootstrap-icons";
-    src: url("icons.woff2?v=43") format("woff2");
+    src: url("icons.woff2?v=46") format("woff2");
 }
 
 .bi::before,
@@ -25,12 +25,15 @@
 .bi-arrow-left-right::before { content: "\f12b"; }
 .bi-arrow-repeat::before { content: "\f130"; }
 .bi-arrow-up::before { content: "\f148"; }
+.bi-arrows-fullscreen::before { content: "\f14d"; }
 .bi-basket::before { content: "\f180"; }
 .bi-calendar-event::before { content: "\f1e8"; }
 .bi-check-lg::before { content: "\f633"; }
 .bi-check2::before { content: "\f272"; }
 .bi-check2-all::before { content: "\f26f"; }
 .bi-chevron-down::before { content: "\f282"; }
+.bi-chevron-left::before { content: "\f284"; }
+.bi-chevron-right::before { content: "\f285"; }
 .bi-exclamation-circle::before { content: "\f333"; }
 .bi-exclamation-triangle::before { content: "\f33b"; }
 .bi-exclamation-triangle-fill::before { content: "\f33a"; }

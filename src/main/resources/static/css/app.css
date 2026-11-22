@@ -1456,12 +1456,12 @@ dialog.sheet::backdrop {
     color: var(--ink-2);
 }
 
-.station-toggle[aria-pressed="false"] {
+.station-toggle[aria-pressed="true"] {
     color: var(--danger);
     background: var(--danger-soft);
 }
 
-.station-toggle[aria-pressed="false"]::after {
+.station-toggle[aria-pressed="true"]::after {
     content: "";
     position: absolute;
     left: 50%;
@@ -2074,7 +2074,6 @@ dialog.sheet-bottom[open] {
 /* Disabled tools look switched off, not pressed */
 .button-row.tools > .btn-secondary:disabled {
     background: transparent;
-    border-style: dashed;
     color: color-mix(in oklch, var(--ink-2) 70%, var(--bg));
 }
 
@@ -2156,8 +2155,14 @@ dialog.sheet-bottom[open] {
 
 /* Entry bar on phones: one line of numbers; words only while they fit */
 @media (max-width: 480px) {
+    /* Hidden from sight only: screen readers still hear "18 Kinder, 7 Paare" */
     #stationSummary:has(.stat:nth-child(4)) .stat:not(.is-warn) .stat-label {
-        display: none;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 }
 
@@ -2165,4 +2170,276 @@ dialog.sheet-bottom[open] {
 .slot-group .tag-note {
     background: var(--surface);
     color: var(--ink-2);
+}
+
+/* ===== Bottom bar: Weiter gets the room, undo is an icon ===== */
+.button-row.tools > .tool-main {
+    flex: 1.8;
+}
+
+@media (max-width: 899px) {
+    .button-row.tools > .tool-icon {
+        flex: 0 0 52px;
+    }
+
+    .button-row.tools > .tool-icon .tool-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .button-row.tools > .tool-icon i {
+        font-size: 1.375rem;
+    }
+}
+
+.sheet-count {
+    margin: var(--space-2) 0 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Opened played cards stay visibly in the past */
+.exercise.is-played:not(.is-collapsed) {
+    background: var(--surface-2);
+}
+
+.exercise.is-played:not(.is-collapsed) .row {
+    background: color-mix(in oklch, var(--surface) 60%, var(--surface-2));
+}
+
+.played-hide {
+    margin-top: var(--space-3);
+}
+
+.played-hide .bi {
+    transform: rotate(180deg);
+}
+
+/* Elo gap well above this plan's usual: amber */
+.slot-group .tag-note.is-wide {
+    background: var(--sparring-soft);
+    color: var(--sparring);
+    font-weight: 700;
+}
+
+/* Desktop: the card being edited takes the whole row, groups side by side */
+.exercise.is-editing {
+    grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+    .exercise.is-editing {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: var(--space-3);
+        align-items: start;
+    }
+
+    .exercise.is-editing > :not(.slot-group) {
+        grid-column: 1 / -1;
+    }
+
+    .exercise.is-editing > .exercise-head,
+    .exercise.is-editing > .edit-hint {
+        margin-bottom: 0;
+    }
+
+    .exercise.is-editing .slot-group + .slot-group {
+        margin-top: 0;
+    }
+}
+
+/* ===== Jetzt-Ansicht ===== */
+dialog.focus-dialog {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--bg);
+    color: var(--ink);
+}
+
+dialog.focus-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+dialog.focus-dialog::backdrop {
+    background: var(--bg);
+}
+
+.focus-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2);
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+}
+
+.focus-dialog.is-now .focus-head {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-bottom-color: var(--accent);
+}
+
+.focus-head h2 {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-size: 1.625rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.focus-dialog.is-now .ex-badge.is-now {
+    background: var(--on-accent);
+    color: var(--accent);
+}
+
+.focus-head .btn {
+    color: inherit;
+    font-size: 1.25rem;
+}
+
+.focus-head .btn:disabled {
+    opacity: 0.3;
+}
+
+.focus-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4);
+    touch-action: pan-y;
+}
+
+/* Names twice as big as on the plan */
+.focus-body .row {
+    padding: var(--space-3) var(--space-4);
+    font-size: 1.5rem;
+}
+
+.focus-body .row .tag {
+    font-size: 1rem;
+}
+
+.focus-body .group-label {
+    font-size: 0.9375rem;
+}
+
+.focus-body .third-note,
+.focus-body .row-note {
+    font-size: 1rem;
+}
+
+.focus-body .hints {
+    font-size: 1rem;
+}
+
+.focus-foot {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+}
+
+.focus-foot .tool-icon {
+    flex: 0 0 60px;
+    min-height: 64px;
+    font-size: 1.5rem;
+}
+
+.focus-next {
+    flex: 1;
+    min-height: 64px;
+    font-size: 1.375rem;
+}
+
+@media (min-width: 900px) {
+    .focus-body {
+        width: 100%;
+        max-width: 760px;
+        margin: 0 auto;
+    }
+}
+
+/* "Kommt dazu" is the longest label; "Geht" needs the least */
+@media (max-width: 899px) {
+    #missingBtn {
+        flex: 0.9;
+    }
+
+    #addKidBtn {
+        flex: 1.25;
+    }
+}
+
+/* ===== Jetzt-Ansicht fits one phone screen ===== */
+.focus-tool {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.8125rem;
+}
+
+.focus-tool i {
+    font-size: 1.375rem;
+}
+
+/* The running card's band also opens the big view */
+.exercise.is-now .focus-open {
+    color: var(--on-accent);
+    margin-left: auto;
+}
+
+@media (hover: hover) {
+    .exercise.is-now .focus-open:not(:disabled):hover {
+        background: oklch(1 0 0 / 0.15);
+    }
+}
+
+@media (max-width: 599px) {
+    .focus-body {
+        padding: var(--space-3);
+    }
+
+    /* One line per pair where names allow: a whole Übung on one screen */
+    .focus-body .row {
+        padding: var(--space-2) var(--space-3);
+        font-size: 1.125rem;
+        line-height: 1.3;
+    }
+
+    .focus-body .rows {
+        gap: 6px;
+    }
+
+    .focus-body .group-label {
+        margin: var(--space-3) 0 var(--space-1);
+    }
+
+    .focus-body .group-label:first-child {
+        margin-top: 0;
+    }
+
+    .focus-body .third-note {
+        font-size: 0.875rem;
+    }
+}
+
+.focus-foot .focus-tool span {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.1;
 }

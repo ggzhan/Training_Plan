@@ -108,11 +108,11 @@ function renderPlayerList() {
             <button type="button" class="btn btn-icon star-toggle" aria-pressed="${starred}"
                 aria-label="Mehr Stationen für ${name}" title="${starred ? 'Mehr Stationen' : 'Normal'}">
                 <i class="bi ${starred ? 'bi-star-fill' : 'bi-star'}" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${!noBucket}"
-                aria-label="Balleimer erlaubt für ${name}" title="${noBucket ? 'Kein Balleimer' : 'Balleimer erlaubt'}">
+            <button type="button" class="btn btn-icon station-toggle is-bucket" aria-pressed="${noBucket}"
+                aria-label="Nie an den Balleimer: ${name}" title="${noBucket ? 'Nie an den Balleimer' : 'Balleimer erlaubt'}">
                 <i class="bi bi-basket" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${!noSpar}"
-                aria-label="Sparring erlaubt für ${name}" title="${noSpar ? 'Kein Sparring' : 'Sparring erlaubt'}">
+            <button type="button" class="btn btn-icon station-toggle is-sparring" aria-pressed="${noSpar}"
+                aria-label="Nie ins Sparring: ${name}" title="${noSpar ? 'Nie ins Sparring' : 'Sparring erlaubt'}">
                 <i class="bi bi-person-badge" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-icon btn-quiet" aria-label="${name} bearbeiten oder entfernen">
                 <i class="bi bi-pencil" aria-hidden="true"></i></button>`;
@@ -765,6 +765,19 @@ function showFormError(message) {
 function generatePlan(event) {
     event.preventDefault();
     if ($('generateBtn').disabled) return;
+    // A training that is running would lose its progress: ask first
+    const running = readStored(STORAGE_KEYS.plan);
+    const now = running && Number.isInteger(running.now) ? running.now : null;
+    if (now !== null && now < (running.exercises || []).length) {
+        $('replaceText').textContent = `Übung ${now + 1} läuft gerade. Ein neuer Plan ersetzt dieses Training.`;
+        Motion.openDialog($('replaceDialog'));
+        $('replaceCancel').focus();
+        return;
+    }
+    continueGenerate();
+}
+
+function continueGenerate() {
     if (stationNumbers().playing % 2 === 1) {
         openOddDialog();
         return;
@@ -776,7 +789,7 @@ function generatePlan(event) {
 function openOddDialog() {
     const { playing } = stationNumbers();
     const fix = balleimerFix();
-    $('oddText').textContent = `In jeder Übung spielen ${playing - 1} Kinder in Paaren, 1 Kind bleibt allein.`;
+    $('oddText').textContent = `In jeder Übung spielen ${playing - 1} Kinder in Paaren, 1 Kind spielt als Dritter bei einem Paar mit.`;
     const fixButton = $('oddFix');
     fixButton.hidden = !fix;
     if (fix) {
@@ -886,6 +899,10 @@ document.addEventListener('DOMContentLoaded', () => {
         Motion.toggle(info, open);
     }));
 
+    $('replaceConfirm').addEventListener('click', () => {
+        Motion.closeDialog($('replaceDialog'));
+        continueGenerate();
+    });
     $('oddAnyway').addEventListener('click', () => {
         Motion.closeDialog($('oddDialog'));
         createPlan();

@@ -245,10 +245,12 @@ function render() {
     $('actionbar').hidden = false;
     $('exnav').hidden = false;
     $('pdfBtn').hidden = false;
+    $('focusBtn').hidden = false;
 
     renderNav();
     renderExercises();
     renderBar();
+    if (focusOpen()) renderFocus();
 }
 
 function renderNav() {
@@ -295,19 +297,8 @@ function joinOf(ex, unpairedIndex) {
     return Number.isInteger(join) && join >= 0 && join < ex.pairs.length ? join : -1;
 }
 
-// Played Übungen fold to one line during the training; tap to look back
-const openPlayed = new Set();
-
-function renderViewCard(ex, index) {
-    const section = document.createElement('section');
-    const now = nowIndex();
-    const played = isPlayed(index);
-    const open = !played || openPlayed.has(index);
-    section.className = 'exercise' + (index === now ? ' is-now' : played ? ' is-played' : '') + (open ? '' : ' is-collapsed');
-    section.dataset.flipId = `card-${index}`;
-    section.id = `ex-${index + 1}`;
-    section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
-
+// Pairs and stations of one Übung, shared by the cards and the Jetzt-Ansicht
+function cardBody(ex, index) {
     let body = '';
     if (ex.pairs.length > 0) {
         // A kid without a partner plays as the third with the pair the planner chose
@@ -340,6 +331,23 @@ function renderViewCard(ex, index) {
     if (stations.length > 0) {
         body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
     }
+    return body;
+}
+
+// Played Übungen fold to one line during the training; tap to look back
+const openPlayed = new Set();
+
+function renderViewCard(ex, index) {
+    const section = document.createElement('section');
+    const now = nowIndex();
+    const played = isPlayed(index);
+    const open = !played || openPlayed.has(index);
+    section.className = 'exercise' + (index === now ? ' is-now' : played ? ' is-played' : '') + (open ? '' : ' is-collapsed');
+    section.dataset.flipId = `card-${index}`;
+    section.id = `ex-${index + 1}`;
+    section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
+
+    let body = cardBody(ex, index);
     body += hintsHtml(index, ex);
 
     const editBtn = `<button type="button" class="btn btn-quiet edit-btn" aria-label="${exerciseLabel(index + 1)} bearbeiten">
@@ -350,16 +358,23 @@ function renderViewCard(ex, index) {
             <h2 id="ex-title-${index + 1}"><button type="button" class="played-toggle" aria-expanded="${open}" aria-controls="ex-body-${index + 1}">
                 <i class="bi bi-check2" aria-hidden="true"></i> ${exerciseLabel(index + 1)} <span class="played-note">gespielt</span>
                 <i class="bi bi-chevron-down" aria-hidden="true"></i></button></h2>
-        </div>${open ? `<div id="ex-body-${index + 1}">${body}</div>` : ''}`;
+        </div>${open ? `<div id="ex-body-${index + 1}">${body}
+            <button type="button" class="btn btn-quiet btn-block played-hide"><i class="bi bi-chevron-down" aria-hidden="true"></i> Ausblenden</button></div>` : ''}`;
         section.querySelector('.played-toggle').addEventListener('click', () => togglePlayed(index));
+        const hide = section.querySelector('.played-hide');
+        if (hide) hide.addEventListener('click', () => togglePlayed(index));
     } else {
         const badge = index === now ? '<span class="ex-badge is-now">Jetzt</span>'
             : changedCards.has(index) ? '<span class="ex-badge is-changed">Neu eingeteilt</span>' : '';
+        const bigBtn = index === now ? `<button type="button" class="btn btn-quiet focus-open" aria-label="${exerciseLabel(index + 1)} gross anzeigen">
+                <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i> Gross</button>` : '';
         section.innerHTML = `
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} ${badge}</h2>
-            ${editBtn}
+            ${bigBtn}${editBtn}
         </div>${body}`;
+        const big = section.querySelector('.focus-open');
+        if (big) big.addEventListener('click', openFocus);
     }
     const edit = section.querySelector('.edit-btn');
     if (edit) edit.addEventListener('click', () => startEdit(index));
@@ -403,9 +418,15 @@ function renderEditCard(index) {
     let group = 0;
     const tag = (html) => { group++; return `<span class="tag" id="grp-${index}-${group}">${html}</span>`; };
     const open = () => `role="group" aria-labelledby="grp-${index}-${group + 1}"`;
+    const saved = plan.exercises[index].pairs;
+    const wide = wideGap();
     draft.pairs.forEach((p, n) => {
         const gap = Math.abs(p.player1.elo - p.player2.elo);
-        body += `<div class="slot-group slot-pair" ${open()}>${tag(`Paar ${n + 1} <span class="tag-note">Elo-Abstand ${gap}</span>`)}
+        const before = saved[n] ? Math.abs(saved[n].player1.elo - saved[n].player2.elo) : gap;
+        const text = before === gap ? `Elo-Abstand ${gap}` : `Elo-Abstand ${before} → ${gap}`;
+        const cls = gap > wide ? ' is-wide' : '';
+        const verdict = gap > wide ? ' – gross' : '';
+        body += `<div class="slot-group slot-pair" ${open()}>${tag(`Paar ${n + 1} <span class="tag-note${cls}">${text}${verdict}</span>`)}
             ${kid(p.player1, `Paar ${n + 1}, erstes Kind`)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
     });
     if (draft.mentalTrainer.length > 0) {
@@ -440,7 +461,7 @@ function renderEditCard(index) {
     section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
     section.innerHTML = `
         <div class="exercise-head">
-            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} <span class="visually-hidden">bearbeiten</span></h2>
+            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)}${index === nowIndex() ? ' <span class="ex-badge is-now">Jetzt</span>' : ''} <span class="visually-hidden">bearbeiten</span></h2>
         </div>${body}${regenBlock}`;
     section.querySelectorAll('.slot-btn').forEach(el =>
         el.addEventListener('click', () => tapSlot(parseInt(el.dataset.slot, 10))));
@@ -498,6 +519,13 @@ function rerenderEdit(focusSlot) {
     if (again) again.focus({ preventScroll: true });
 }
 
+// A pair gap counts as "gross" well above what this plan usually has
+function wideGap() {
+    const gaps = plan.exercises.flatMap(ex => ex.pairs.map(p => Math.abs(p.player1.elo - p.player2.elo))).sort((a, b) => a - b);
+    const median = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+    return Math.max(150, median * 2);
+}
+
 // Quiet status for screen readers, without a toast on screen
 function announce(message) {
     const el = $('srStatus');
@@ -521,7 +549,7 @@ function renderBar() {
     const absent = (plan.absent || []).length;
     $('absentBadge').hidden = absent === 0;
     $('absentBadge').textContent = absent;
-    $('missingBtn').setAttribute('aria-label', absent > 0 ? `Fehlt (${absent} fehlen)` : 'Fehlt');
+    $('missingBtn').setAttribute('aria-label', absent > 0 ? `Wer geht? (${absent} gegangen)` : 'Wer geht?');
 
     // Start → Weiter → Fertig
     const now = nowIndex();
@@ -739,7 +767,8 @@ function attendanceChanged() {
 
 function renderAttendance() {
     if (!attendance) return;
-    $('presentCount').textContent = attendance.present.size;
+    const leaving = allKids().length - attendance.present.size;
+    $('presentCount').textContent = `${attendance.present.size} bleiben · ${leaving} ${leaving === 1 ? 'geht' : 'gehen'}`;
 
     const chips = $('attendanceChips');
     chips.innerHTML = '';
@@ -766,9 +795,8 @@ function renderAttendance() {
     const apply = $('applyAttendance');
     apply.disabled = !changed || busy;
     apply.textContent = from === 1 ? 'Ganzen Plan anpassen' : `Ab ${exerciseLabel(from)} anpassen`;
-    const missing = allKids().length - attendance.present.size;
-    $('applyHint').textContent = (missing === 0 ? 'Alle da. ' : `${missing} ${missing === 1 ? 'fehlt' : 'fehlen'}. `)
-        + (from === 1 ? 'Alle Übungen werden neu eingeteilt.' : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt wie sie ist.`);
+    $('applyHint').textContent = from === 1 ? 'Alle Übungen werden neu eingeteilt.'
+        : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt wie sie ist.`;
 
     // Say before applying when someone would be left without a partner, and offer the fix
     const atBuckets = attendance.sizes.reduce((sum, size) => sum + size, 0);
@@ -815,11 +843,16 @@ function applyAttendance() {
     }
 
     $('applyAttendance').disabled = true;
+    const before = new Set(plan.players.map(p => p.name));
     replan(next, from - 2)
         .then(() => {
             closeAttendance();
             Motion.scrollTo($(`ex-${from}`));
-            toast(`Plan ab ${exerciseLabel(from)} angepasst${unpairedNote(from - 1)}`, { label: 'Rückgängig', run: undo });
+            // "Ab Übung 3 ohne Ved" says exactly what happened
+            const gone = next.absent.filter(k => before.has(k.name)).map(k => k.name);
+            const message = gone.length > 0 && gone.length <= 3
+                ? `Ab ${exerciseLabel(from)} ohne ${gone.join(', ')}` : `Plan ab ${exerciseLabel(from)} angepasst`;
+            toast(message + unpairedNote(from - 1), { label: 'Rückgängig', run: undo });
         })
         .catch(error => {
             $('applyHint').textContent = 'Anpassen ging nicht. ' + friendlyError(error);
@@ -958,6 +991,97 @@ function confirmAddKid(event) {
         .finally(() => renderAddKid());
 }
 
+// ===== JETZT-ANSICHT =====
+// Only one Übung, big: what the coach glances at between drills. Browsing
+// (swipe, arrows) never changes which Übung is running; Weiter does.
+let focusIndex = 0;
+
+function focusOpen() {
+    return $('focusDialog').open;
+}
+
+function openFocus() {
+    if (editingIndex !== null) saveEdit({ quiet: true });
+    const now = nowIndex();
+    focusIndex = now === null ? 0 : Math.min(now, plan.exercises.length - 1);
+    renderFocus();
+    Motion.openDialog($('focusDialog'));
+}
+
+function renderFocus(direction = 0) {
+    const total = plan.exercises.length;
+    const now = nowIndex();
+    focusIndex = Math.max(0, Math.min(focusIndex, total - 1));
+    const ex = plan.exercises[focusIndex];
+    const state = focusIndex === now ? 'Jetzt' : isPlayed(focusIndex) ? 'gespielt'
+        : now !== null && focusIndex === now + 1 ? 'als Nächstes' : '';
+    $('focusTitle').innerHTML = `${exerciseLabel(focusIndex + 1)}${state ? ` <span class="ex-badge${focusIndex === now ? ' is-now' : ''}">${state}</span>` : ''}`;
+    $('focusDialog').classList.toggle('is-now', focusIndex === now);
+    const body = $('focusBody');
+    body.innerHTML = cardBody(ex, focusIndex);
+    // At a glance the first question is "where do I go?": stations come first
+    const labels = body.querySelectorAll(':scope > .group-label');
+    if (labels.length === 2) {
+        const stationsList = labels[1].nextElementSibling;
+        body.prepend(labels[1], stationsList);
+    }
+    $('focusPrev').disabled = focusIndex === 0;
+    $('focusNext').disabled = focusIndex === total - 1;
+
+    const label = $('focusAdvanceLabel');
+    const button = $('focusAdvance');
+    if (now === null) label.textContent = 'Start';
+    else if (now < total - 1) label.textContent = `Weiter: ${now + 2}`;
+    else if (now === total - 1) label.textContent = 'Fertig';
+    else label.textContent = 'Beendet';
+    button.disabled = busy || (now !== null && now >= total);
+    if (direction && Motion.full() && window.gsap) {
+        window.gsap.fromTo(body, { x: 40 * direction, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.25, ease: 'power3.out', clearProps: 'transform,opacity,visibility' });
+    }
+}
+
+function browseFocus(step) {
+    const next = focusIndex + step;
+    if (next < 0 || next >= plan.exercises.length) return;
+    focusIndex = next;
+    renderFocus(step);
+}
+
+function advanceFromFocus() {
+    advance();
+    const now = nowIndex();
+    focusIndex = Math.min(now, plan.exercises.length - 1);
+    renderFocus(1);
+    const num = $('focusAdvanceLabel');
+    Motion.pop(num);
+}
+
+function wireFocus() {
+    $('focusBtn').addEventListener('click', openFocus);
+    $('focusClose').addEventListener('click', () => Motion.closeDialog($('focusDialog')));
+    $('focusPrev').addEventListener('click', () => browseFocus(-1));
+    $('focusNext').addEventListener('click', () => browseFocus(1));
+    $('focusAdvance').addEventListener('click', advanceFromFocus);
+    $('focusLeave').addEventListener('click', openAttendance);
+    $('focusJoin').addEventListener('click', openAddKid);
+    $('focusDialog').addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') browseFocus(-1);
+        else if (e.key === 'ArrowRight') browseFocus(1);
+    });
+    // Swipe sideways to look at the other Übungen
+    let startX = null;
+    let startY = null;
+    const body = $('focusBody');
+    body.addEventListener('pointerdown', (e) => { startX = e.clientX; startY = e.clientY; });
+    body.addEventListener('pointerup', (e) => {
+        if (startX === null) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        startX = null;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) browseFocus(dx < 0 ? 1 : -1);
+    });
+}
+
 // ===== PDF =====
 function exportPdf() {
     if (editingIndex !== null) saveEdit({ quiet: true });
@@ -996,6 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('undoBtn').addEventListener('click', undo);
     $('nextBtn').addEventListener('click', advance);
+    wireFocus();
     $('pdfBtn').addEventListener('click', exportPdf);
     $('saveEdit').addEventListener('click', () => saveEdit());
     $('cancelEdit').addEventListener('click', cancelEdit);
