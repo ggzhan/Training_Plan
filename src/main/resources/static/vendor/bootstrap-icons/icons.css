@@ -1,0 +1,65 @@
+/* Bootstrap Icons 1.11.0 (MIT), subset by tools/subset-icons.py: 43 icons */
+@font-face {
+    font-display: block;
+    font-family: "bootstrap-icons";
+    src: url("icons.woff2?v=43") format("woff2");
+}
+
+.bi::before,
+[class^="bi-"]::before,
+[class*=" bi-"]::before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.bi-arrow-counterclockwise::before { content: "\f117"; }
+.bi-arrow-left::before { content: "\f12f"; }
+.bi-arrow-left-right::before { content: "\f12b"; }
+.bi-arrow-repeat::before { content: "\f130"; }
+.bi-arrow-up::before { content: "\f148"; }
+.bi-basket::before { content: "\f180"; }
+.bi-calendar-event::before { content: "\f1e8"; }
+.bi-check-lg::before { content: "\f633"; }
+.bi-check2::before { content: "\f272"; }
+.bi-check2-all::before { content: "\f26f"; }
+.bi-chevron-down::before { content: "\f282"; }
+.bi-exclamation-circle::before { content: "\f333"; }
+.bi-exclamation-triangle::before { content: "\f33b"; }
+.bi-exclamation-triangle-fill::before { content: "\f33a"; }
+.bi-file-earmark-arrow-down::before { content: "\f356"; }
+.bi-flag-fill::before { content: "\f3cb"; }
+.bi-graph-up-arrow::before { content: "\f673"; }
+.bi-hourglass-split::before { content: "\f41f"; }
+.bi-info-circle::before { content: "\f431"; }
+.bi-lightbulb::before { content: "\f46b"; }
+.bi-list-ol::before { content: "\f475"; }
+.bi-pencil::before { content: "\f4cb"; }
+.bi-people::before { content: "\f4d0"; }
+.bi-person-badge::before { content: "\f4d3"; }
+.bi-person-dash::before { content: "\f4d9"; }
+.bi-person-fill::before { content: "\f4da"; }
+.bi-person-plus::before { content: "\f4dd"; }
+.bi-play-fill::before { content: "\f4f4"; }
+.bi-plus-lg::before { content: "\f64d"; }
+.bi-question-lg::before { content: "\f64e"; }
+.bi-shuffle::before { content: "\f544"; }
+.bi-skip-end-fill::before { content: "\f557"; }
+.bi-slash-circle::before { content: "\f567"; }
+.bi-sliders::before { content: "\f56b"; }
+.bi-sort-alpha-down::before { content: "\f571"; }
+.bi-sort-down::before { content: "\f575"; }
+.bi-sort-numeric-down-alt::before { content: "\f576"; }
+.bi-sort-up::before { content: "\f57b"; }
+.bi-star::before { content: "\f588"; }
+.bi-star-fill::before { content: "\f586"; }
+.bi-trash3::before { content: "\f78b"; }
+.bi-x-lg::before { content: "\f659"; }
+.bi-x-octagon::before { content: "\f627"; }

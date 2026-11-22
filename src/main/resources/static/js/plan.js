@@ -1,5 +1,6 @@
-// Plan page: shows the stored plan, edits one exercise at a time, adjusts the
-// plan to who is actually there, undo/redo, PDF.
+// Plan page: shows the stored plan, follows the training Übung by Übung
+// ("Jetzt"), edits one exercise at a time, adjusts the plan to who is actually
+// there, undo, PDF.
 //
 // Every kid has exactly one place per exercise (pair, Mentaltrainer, Balleimer,
 // sparring or ohne Partner). Editing changes a place by swapping with whoever holds the chosen
@@ -13,7 +14,8 @@ let historyStack = [];
 let redoStack = [];
 let busy = false;
 let currentIndex = 0; // exercise nearest the top of the screen
-let attendance = null; // {present: Set of names, added: [players]} while the panel is open
+let changedCards = new Set(); // Übungen the last re-plan or undo changed, marked until the next change
+let attendance = null; // {present: Set of names, added: [players]} while the sheet is open
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,6 +37,33 @@ function exerciseLabel(n) {
     return `Übung ${n}`;
 }
 
+// The Übung being played right now: null before the start, exercises.length once finished
+function nowIndex() {
+    return Number.isInteger(plan.now) ? plan.now : null;
+}
+
+// Changes made during the training start with the next Übung, never with one already played
+function firstOpenExercise() {
+    const now = nowIndex();
+    if (now === null) return 1;
+    return Math.min(now + 2, plan.exercises.length);
+}
+
+function isPlayed(index) {
+    const now = nowIndex();
+    return now !== null && index < now;
+}
+
+// "Übung 3 (jetzt)" options; played ones are shown but cannot be picked
+function fromOptions(prefix) {
+    const now = nowIndex();
+    return plan.exercises.map((_, i) => {
+        const played = isPlayed(i);
+        const note = i === now ? ' (jetzt)' : played ? ' (gespielt)' : '';
+        return `<option value="${i + 1}"${played ? ' disabled' : ''}>${prefix}${exerciseLabel(i + 1)}${note}</option>`;
+    }).join('');
+}
+
 function mentalLength() {
     return Math.max(1, (plan.settings && plan.settings.mentalTrainerLength) || 1);
 }
@@ -51,7 +80,10 @@ function mentalSessionLabel(index) {
 // ===== HISTORY =====
 // Snapshots include the kids, since adjusting attendance changes them
 function snapshot() {
-    return clone({ players: plan.players, absent: plan.absent || [], exercises: plan.exercises, settings: plan.settings });
+    return clone({
+        players: plan.players, absent: plan.absent || [], exercises: plan.exercises,
+        settings: plan.settings, now: nowIndex()
+    });
 }
 
 function restore(state) {
@@ -59,31 +91,35 @@ function restore(state) {
     plan.absent = state.absent;
     plan.exercises = state.exercises;
     if (state.settings) plan.settings = state.settings;
+    plan.now = state.now;
 }
 
 function pushHistory() {
     historyStack.push(snapshot());
     redoStack = [];
+    changedCards = new Set();
 }
 
 function undo() {
     if (historyStack.length === 0 || busy) return;
     cancelEdit();
+    const before = plan.exercises;
     redoStack.push(snapshot());
     restore(historyStack.pop());
     savePlan();
-    renderWithFlip();
-    toast('Rückgängig gemacht');
+    renderWithFlip(before);
+    toast('Rückgängig gemacht', { label: 'Wiederholen', run: redo });
 }
 
 function redo() {
     if (redoStack.length === 0 || busy) return;
     cancelEdit();
+    const before = plan.exercises;
     historyStack.push(snapshot());
     restore(redoStack.pop());
     savePlan();
-    renderWithFlip();
-    toast('Wiederhergestellt');
+    renderWithFlip(before);
+    toast('Wiederhergestellt', { label: 'Rückgängig', run: undo });
 }
 
 // ===== PLACES =====
@@ -131,28 +167,31 @@ function changeSlot(slotIndex, name) {
 }
 
 // ===== RULE HINTS =====
-// What this exercise repeats from earlier ones; recomputed after every change
+// What this exercise breaks or repeats; recomputed after every change.
+// "rule": a setting is broken (red). "warn": worth a look (amber).
+// "note": expected and already announced on the entry page (quiet).
 function hintsFor(index, ex) {
     const hints = [];
+    const add = (level, text) => hints.push({ level, text });
     const never = new Set((plan.settings.neverTogether || []).map(pair => [...pair].sort().join('\u0000')));
     const noBalleimer = new Set(plan.settings.noBalleimer || []);
     const noSparring = new Set(plan.settings.noSparring || []);
     ex.balleimer.flat().forEach(p => {
-        if (noBalleimer.has(p.name)) hints.push(`${p.name} soll nicht an den Balleimer.`);
+        if (noBalleimer.has(p.name)) add('rule', `${p.name} soll nicht an den Balleimer.`);
     });
     ex.sparring.forEach(sp => {
-        if (noSparring.has(sp.player.name)) hints.push(`${sp.player.name} soll kein Sparring spielen.`);
+        if (noSparring.has(sp.player.name)) add('rule', `${sp.player.name} soll kein Sparring spielen.`);
     });
     ex.pairs.forEach(p => {
         if (never.has([p.player1.name, p.player2.name].sort().join('\u0000'))) {
-            hints.push(`${p.player1.name} & ${p.player2.name} sollen nie zusammen spielen.`);
+            add('rule', `${p.player1.name} & ${p.player2.name} sollen nie zusammen spielen.`);
         }
     });
     const length = mentalLength();
     if (length > 1 && index % length !== 0 && ex.mentalTrainer.length > 0) {
         const previous = plan.exercises[index - 1].mentalTrainer.map(p => p.name).sort().join('|');
         if (previous !== ex.mentalTrainer.map(p => p.name).sort().join('|')) {
-            hints.push(`Die Mentaltrainer-Gruppe ist anders als in ${exerciseLabel(index)}, obwohl die Einheit weiterläuft.`);
+            add('warn', `Mentaltrainer-Gruppe wechselt mitten in der Einheit (anders als ${exerciseLabel(index)}).`);
         }
     }
     const pairKey = (a, b) => [a, b].sort().join('\u0000');
@@ -162,23 +201,23 @@ function hintsFor(index, ex) {
         const earlierPairs = new Set(earlier.pairs.map(p => pairKey(p.player1.name, p.player2.name)));
         ex.pairs.forEach(p => {
             if (earlierPairs.has(pairKey(p.player1.name, p.player2.name))) {
-                hints.push(`${p.player1.name} & ${p.player2.name} spielen schon in ${label} zusammen.`);
+                add('warn', `${p.player1.name} & ${p.player2.name} spielten schon in ${label} zusammen.`);
             }
         });
         const earlierBuckets = new Set(earlier.balleimer.flat().map(p => p.name));
         ex.balleimer.flat().forEach(p => {
             // Extra turns are intended for starred kids, and for everyone when strong kids go more often
             const intended = plan.settings.strongAtStations || (plan.settings.extraStationKids || []).includes(p.name);
-            if (earlierBuckets.has(p.name) && !intended) hints.push(`${p.name} war schon in ${label} am Balleimer.`);
+            if (earlierBuckets.has(p.name) && !intended) add('note', `${p.name} war schon in ${label} am Balleimer.`);
         });
         ex.sparring.forEach(s => {
             if (earlier.sparring.some(o => o.partner === s.partner && o.player.name === s.player.name)) {
-                hints.push(`${s.player.name} spielte schon in ${label} mit ${s.partner}.`);
+                add('note', `${s.player.name} spielte schon in ${label} mit ${s.partner}.`);
             }
         });
         const earlierUnpaired = new Set(earlier.unpaired.map(p => p.name));
         ex.unpaired.forEach(p => {
-            if (earlierUnpaired.has(p.name)) hints.push(`${p.name} war schon in ${label} ohne Partner.`);
+            if (earlierUnpaired.has(p.name)) add('warn', `${p.name} war schon in ${label} ohne Partner.`);
         });
     }
     return hints;
@@ -187,7 +226,15 @@ function hintsFor(index, ex) {
 function hintsHtml(index, ex) {
     const hints = hintsFor(index, ex);
     if (hints.length === 0) return '';
-    return `<div class="notice notice-danger hints"><ul>${hints.map(h => `<li>${escapeHtml(h)}</li>`).join('')}</ul></div>`;
+    const list = (level, cls, icon) => {
+        const items = hints.filter(h => h.level === level);
+        if (items.length === 0) return '';
+        return `<div class="hints ${cls}"><i class="bi ${icon}" aria-hidden="true"></i>`
+            + `<ul>${items.map(h => `<li>${escapeHtml(h.text)}</li>`).join('')}</ul></div>`;
+    };
+    return list('rule', 'notice notice-danger', 'bi-x-octagon')
+        + list('warn', 'notice notice-warn', 'bi-exclamation-triangle')
+        + list('note', 'hints-note', 'bi-info-circle');
 }
 
 // ===== RENDERING =====
@@ -215,21 +262,24 @@ function render() {
     if (s.sparringPartners.length > 0) meta.push(`Sparring: ${s.sparringPartners.join(', ')}`);
     $('planMeta').textContent = meta.join(' · ');
 
-    $('attendance').hidden = false;
     $('actionbar').hidden = false;
     $('exnav').hidden = false;
+    $('pdfBtn').hidden = false;
 
     renderNav();
-    renderAttendance();
     renderExercises();
     renderBar();
 }
 
 function renderNav() {
     const nav = $('exnavInner');
-    nav.innerHTML = '<span class="exnav-indicator" aria-hidden="true"></span>' + plan.exercises.map((_, i) =>
-        `<a href="#ex-${i + 1}" aria-label="${exerciseLabel(i + 1)}"${i === currentIndex ? ' aria-current="true"' : ''}>${i + 1}</a>`
-    ).join('');
+    const now = nowIndex();
+    nav.innerHTML = '<span class="exnav-indicator" aria-hidden="true"></span>' + plan.exercises.map((_, i) => {
+        const state = i === now ? ' is-now' : isPlayed(i) ? ' is-played' : '';
+        const note = i === now ? ', läuft jetzt' : isPlayed(i) ? ', gespielt' : '';
+        return `<a href="#ex-${i + 1}" class="${state.trim()}" aria-label="${exerciseLabel(i + 1)}${note}"`
+            + `${i === currentIndex ? ' aria-current="true"' : ''}>${i + 1}</a>`;
+    }).join('');
     Motion.slideTo(nav.querySelector('.exnav-indicator'), nav.querySelectorAll('a')[currentIndex], true);
 }
 
@@ -254,7 +304,8 @@ function names(players, index) {
 
 function renderViewCard(ex, index) {
     const section = document.createElement('section');
-    section.className = 'exercise';
+    const now = nowIndex();
+    section.className = 'exercise' + (index === now ? ' is-now' : isPlayed(index) ? ' is-played' : '');
     section.dataset.flipId = `card-${index}`;
     section.id = `ex-${index + 1}`;
     section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
@@ -285,9 +336,12 @@ function renderViewCard(ex, index) {
     }
     body += hintsHtml(index, ex);
 
+    const badge = index === now ? '<span class="ex-badge is-now">Jetzt</span>'
+        : isPlayed(index) ? '<span class="ex-badge"><i class="bi bi-check2" aria-hidden="true"></i> Gespielt</span>'
+            : changedCards.has(index) ? '<span class="ex-badge is-changed">Neu eingeteilt</span>' : '';
     section.innerHTML = `
         <div class="exercise-head">
-            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)}</h2>
+            <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} ${badge}</h2>
             <button type="button" class="btn btn-quiet" aria-label="${exerciseLabel(index + 1)} bearbeiten">
                 <i class="bi bi-pencil" aria-hidden="true"></i> Bearbeiten</button>
         </div>${body}`;
@@ -306,7 +360,7 @@ function renderEditCard(index) {
         return `<select class="control" data-slot="${i}" aria-label="${escapeHtml(label)}">${options}</select>`;
     };
 
-    let body = '';
+    let body = '<p class="info edit-hint">Kind wählen – wer den Platz hatte, tauscht mit.</p>';
     draft.pairs.forEach((p, n) => {
         body += `<div class="slot-group"><span class="tag">Paar ${n + 1}</span>
             ${select(p.player1, `Paar ${n + 1}, erstes Kind`)}${select(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
@@ -350,17 +404,70 @@ function renderBar() {
     $('editBar').hidden = !editing;
     if (switched) Motion.enter([editing ? $('editBar') : $('viewBar')]);
     $('undoBtn').disabled = historyStack.length === 0 || busy;
-    $('redoBtn').disabled = redoStack.length === 0 || busy;
+    $('missingBtn').disabled = busy;
+    $('addKidBtn').disabled = busy;
+
+    const absent = (plan.absent || []).length;
+    $('absentBadge').hidden = absent === 0;
+    $('absentBadge').textContent = absent;
+    $('missingBtn').setAttribute('aria-label', absent > 0 ? `Fehlt (${absent} fehlen)` : 'Fehlt');
+
+    // Start → Weiter → Fertig
+    const now = nowIndex();
+    const total = plan.exercises.length;
+    const next = $('nextBtn');
+    const icon = next.querySelector('i');
+    if (now === null) {
+        $('nextLabel').textContent = 'Start';
+        next.setAttribute('aria-label', `Training starten mit ${exerciseLabel(1)}`);
+        icon.className = 'bi bi-play-fill';
+    } else if (now < total - 1) {
+        $('nextLabel').textContent = `Weiter: ${now + 2}`;
+        next.setAttribute('aria-label', `${exerciseLabel(now + 1)} fertig, weiter mit ${exerciseLabel(now + 2)}`);
+        icon.className = 'bi bi-skip-end-fill';
+    } else if (now === total - 1) {
+        $('nextLabel').textContent = 'Fertig';
+        next.setAttribute('aria-label', `${exerciseLabel(total)} fertig, Training beendet`);
+        icon.className = 'bi bi-flag-fill';
+    } else {
+        $('nextLabel').textContent = 'Beendet';
+        next.setAttribute('aria-label', 'Training beendet');
+        icon.className = 'bi bi-check2-all';
+    }
+    next.disabled = busy || (now !== null && now >= total);
+
     if (editing) {
         const n = editingIndex + 1;
-        const total = plan.exercises.length;
-        $('editHint').textContent = `${exerciseLabel(n)}: Kind auswählen – wer den Platz hatte, wird getauscht.`;
         const regen = $('regenerateBtn');
         regen.hidden = n === total;
-        regen.querySelector('span').textContent = n + 1 === total
+        $('regenerateLabel').textContent = n + 1 === total ? `Übung ${total} neu` : `Ab ${n + 1} neu`;
+        regen.setAttribute('aria-label', n + 1 === total
             ? `Speichern und Übung ${total} neu einteilen`
-            : `Speichern und Übungen ${n + 1}–${total} neu einteilen`;
+            : `Speichern und Übungen ${n + 1}–${total} neu einteilen`);
         regen.disabled = busy;
+    }
+}
+
+// One tap per Übung: the trainer always sees what is on now, and changes start after it
+function advance() {
+    if (busy) return;
+    if (editingIndex !== null) saveEdit({ quiet: true });
+    const total = plan.exercises.length;
+    const now = nowIndex();
+    if (now !== null && now >= total) return;
+    pushHistory();
+    plan.now = now === null ? 0 : now + 1;
+    savePlan();
+    renderNav();
+    renderExercises();
+    renderBar();
+    if (plan.now < total) {
+        const card = $(`ex-${plan.now + 1}`);
+        Motion.scrollTo(card);
+        Motion.pop(card.querySelector('.ex-badge'));
+        toast(`${exerciseLabel(plan.now + 1)} läuft`, { label: 'Rückgängig', run: undo });
+    } else {
+        toast('Training beendet', { label: 'Rückgängig', run: undo });
     }
 }
 
@@ -432,10 +539,24 @@ function cancelEdit() {
     renderBar();
 }
 
-// Re-render after a re-plan or undo: every name glides from its old place in an
-// exercise to its new one, so the trainer sees who moved
-function renderWithFlip() {
-    Motion.flip('.exercise [data-flip-id]', render);
+// Re-render after a re-plan or undo. Only the Übungen that changed and are on
+// screen animate: their names glide to the new places, so the trainer sees who
+// moved. Everything else just re-renders (a full-page Flip froze phones).
+function renderWithFlip(beforeExercises) {
+    const before = beforeExercises || [];
+    const changed = plan.exercises
+        .map((ex, i) => JSON.stringify(ex) !== JSON.stringify(before[i]) ? i : -1)
+        .filter(i => i >= 0);
+    changedCards = new Set(changed);
+    const inView = changed.filter(i => {
+        const card = $(`ex-${i + 1}`);
+        if (!card) return false;
+        const box = card.getBoundingClientRect();
+        return box.bottom > 0 && box.top < window.innerHeight;
+    });
+    if (inView.length === 0) render();
+    else Motion.flip(inView.map(i => `#ex-${i + 1} [data-flip-id]`).join(','), render);
+    inView.forEach(i => Motion.flash($(`ex-${i + 1}`)));
 }
 
 // ===== SERVER: RE-PLAN =====
@@ -450,13 +571,14 @@ function replan(nextPlan, keepThrough) {
     })
         .then(readJsonResponse)
         .then(data => {
+            const before = plan.exercises;
             pushHistory();
             plan.players = nextPlan.players;
             plan.absent = nextPlan.absent;
             plan.exercises = data.exercises;
             plan.settings = data.settings;
             savePlan();
-            renderWithFlip();
+            renderWithFlip(before);
             return data;
         })
         .finally(() => {
@@ -482,19 +604,18 @@ function allKids() {
 }
 
 function openAttendance() {
+    if (busy) return;
+    if (editingIndex !== null) saveEdit({ quiet: true });
     attendance = { present: new Set(plan.players.map(p => p.name)), added: [] };
-    $('applyFrom').innerHTML = plan.exercises.map((_, i) =>
-        `<option value="${i + 1}">ab ${exerciseLabel(i + 1)}</option>`).join('');
-    $('applyFrom').value = String(currentIndex + 1);
+    $('applyFrom').innerHTML = fromOptions('ab ');
+    $('applyFrom').value = String(firstOpenExercise());
     renderAttendance();
-    Motion.toggle($('attendanceBody'), true);
+    Motion.openDialog($('missingDialog'));
     Motion.enter($('attendanceChips').children);
 }
 
-function closeAttendance(onClosed) {
-    attendance = null;
-    renderAttendance();
-    Motion.toggle($('attendanceBody'), false, onClosed);
+function closeAttendance() {
+    Motion.closeDialog($('missingDialog'));
 }
 
 function attendanceChanged() {
@@ -506,13 +627,8 @@ function attendanceChanged() {
 }
 
 function renderAttendance() {
-    const open = attendance !== null;
-    $('toggleAttendance').setAttribute('aria-expanded', String(open));
-    $('toggleAttendance').innerHTML = open
-        ? '<i class="bi bi-x-lg" aria-hidden="true"></i> Schliessen'
-        : '<i class="bi bi-person-dash" aria-hidden="true"></i> Fehlt';
-    $('presentCount').textContent = open ? attendance.present.size : plan.players.length;
-    if (!open) return;
+    if (!attendance) return;
+    $('presentCount').textContent = attendance.present.size;
 
     const chips = $('attendanceChips');
     chips.innerHTML = '';
@@ -527,35 +643,46 @@ function renderAttendance() {
             if (attendance.present.has(kid.name)) attendance.present.delete(kid.name);
             else attendance.present.add(kid.name);
             renderAttendance();
+            const again = [...$('attendanceChips').children].find(c => c.textContent === kid.name);
+            if (again) again.focus();
         });
         chips.appendChild(button);
     });
 
     const changed = attendanceChanged();
-    $('applyAttendance').disabled = !changed || busy;
     const from = parseInt($('applyFrom').value || '1', 10);
-    $('applyHint').textContent = from === 1
-        ? 'Ganzer Plan neu.'
-        : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt.`;
+    const apply = $('applyAttendance');
+    apply.disabled = !changed || busy;
+    apply.textContent = from === 1 ? 'Ganzen Plan anpassen' : `Ab ${exerciseLabel(from)} anpassen`;
+    const missing = allKids().length - attendance.present.size;
+    $('applyHint').textContent = (missing === 0 ? 'Alle da. ' : `${missing} ${missing === 1 ? 'fehlt' : 'fehlen'}. `)
+        + (from === 1 ? 'Alle Übungen werden neu eingeteilt.' : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt wie sie ist.`);
 }
-
 
 function applyAttendance() {
     if (busy || !attendanceChanged()) return;
-    if (editingIndex !== null) saveEdit({ quiet: true });
     const from = parseInt($('applyFrom').value, 10);
     const kids = allKids();
     const next = clone(plan);
     next.players = kids.filter(k => attendance.present.has(k.name));
     next.absent = kids.filter(k => !attendance.present.has(k.name));
+    if (next.players.length < 2) {
+        $('applyHint').textContent = 'Mindestens zwei Kinder müssen da sein.';
+        Motion.shake($('applyHint'));
+        return;
+    }
 
+    $('applyAttendance').disabled = true;
     replan(next, from - 2)
         .then(() => {
-            // Scroll once the panel above has closed, or the target moves up mid-scroll
-            closeAttendance(() => Motion.scrollTo($(`ex-${from}`)));
+            closeAttendance();
+            Motion.scrollTo($(`ex-${from}`));
             toast(`Plan ab ${exerciseLabel(from)} angepasst`, { label: 'Rückgängig', run: undo });
         })
-        .catch(error => toast('Anpassen ging nicht: ' + error.message));
+        .catch(error => {
+            $('applyHint').textContent = 'Anpassen ging nicht: ' + error.message;
+            renderAttendance();
+        });
 }
 
 // ===== KIND KOMMT DAZU =====
@@ -568,11 +695,11 @@ function openAddKid() {
     if (editingIndex !== null) saveEdit({ quiet: true });
     addKidSizes = [...(plan.settings.balleimerSizes || [])];
     $('addKidName').value = '';
+    // A newcomer is usually a beginner: start at the weakest Elo of the day
     $('addKidElo').value = defaultElo(plan.players);
     $('addKidMental').value = plan.settings.mentalTrainerKids || 0;
-    $('addKidFrom').innerHTML = plan.exercises.map((_, i) =>
-        `<option value="${i + 1}">${exerciseLabel(i + 1)}</option>`).join('');
-    $('addKidFrom').value = String(currentIndex + 1);
+    $('addKidFrom').innerHTML = fromOptions('');
+    $('addKidFrom').value = String(firstOpenExercise());
     // Absent kids can come back by name
     $('addKidKnown').innerHTML = (plan.absent || []).map(k => `<option value="${escapeHtml(k.name)}">`).join('');
     $('addKidError').hidden = true;
@@ -626,7 +753,30 @@ function renderAddKid() {
         stats.className = 'stats';
         stats.innerHTML = html;
     }
+    renderAddKidFix(playing);
+    const from = parseInt($('addKidFrom').value || '1', 10);
+    $('confirmAddKid').textContent = from === 1 ? 'Hinzufügen' : `Ab ${exerciseLabel(from)} dabei`;
     $('confirmAddKid').disabled = playing < 0 || busy;
+}
+
+// With an odd number one kid would stand alone: offer the one-tap fix
+let addKidFixAction = null;
+function renderAddKidFix(playing) {
+    const fix = $('addKidFix');
+    addKidFixAction = null;
+    if (playing >= 0 && playing % 2 === 1) {
+        // Smallest Balleimer that can take one more
+        const open = addKidSizes.map((size, i) => ({ size, i })).filter(b => b.size < MAX_PER_BALLEIMER)
+            .sort((x, y) => x.size - y.size)[0];
+        if (open) {
+            fix.textContent = `Balleimer ${open.i + 1}: 1 Kind mehr (${open.size} → ${open.size + 1})`;
+            addKidFixAction = () => { addKidSizes[open.i] += 1; };
+        } else if (addKidSizes.length < MAX_BALLEIMER) {
+            fix.textContent = 'Balleimer mit 1 Kind dazu';
+            addKidFixAction = () => { addKidSizes.push(1); };
+        }
+    }
+    fix.hidden = !addKidFixAction;
 }
 
 function confirmAddKid(event) {
@@ -660,7 +810,7 @@ function confirmAddKid(event) {
             const target = $(`ex-${from}`);
             Motion.scrollTo(target);
         })
-        .catch(e => showError('Ging nicht: ' + e.message))
+        .catch(e => showError('Hinzufügen ging nicht: ' + e.message))
         .finally(() => renderAddKid());
 }
 
@@ -701,17 +851,23 @@ document.addEventListener('DOMContentLoaded', () => {
     Motion.enter(document.querySelectorAll('.exercise'));
 
     $('undoBtn').addEventListener('click', undo);
-    $('redoBtn').addEventListener('click', redo);
+    $('nextBtn').addEventListener('click', advance);
     $('pdfBtn').addEventListener('click', exportPdf);
     $('saveEdit').addEventListener('click', () => saveEdit());
     $('cancelEdit').addEventListener('click', cancelEdit);
     $('regenerateBtn').addEventListener('click', regenerateFollowing);
 
-    $('toggleAttendance').addEventListener('click', () => {
-        if (attendance) closeAttendance();
-        else openAttendance();
-    });
+    $('missingBtn').addEventListener('click', openAttendance);
+    $('closeMissing').addEventListener('click', closeAttendance);
+    $('missingDialog').addEventListener('close', () => { attendance = null; });
     $('applyFrom').addEventListener('change', renderAttendance);
+    $('addKidFrom').addEventListener('change', renderAddKid);
+    $('addKidFix').addEventListener('click', () => {
+        if (!addKidFixAction) return;
+        addKidFixAction();
+        renderAddKid();
+        Motion.flash($('addKidBuckets'));
+    });
     $('addKidBtn').addEventListener('click', openAddKid);
     $('addKidForm').addEventListener('submit', confirmAddKid);
     $('cancelAddKid').addEventListener('click', () => Motion.closeDialog($('addKidDialog')));

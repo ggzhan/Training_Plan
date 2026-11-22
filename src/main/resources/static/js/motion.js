@@ -141,7 +141,8 @@ const Motion = (() => {
             ease: TRAVEL,
             // Stay in the layout: taking items out collapses their container and the page jumps
             absolute: false,
-            nested: true,
+            // Names never nest inside each other, so Flip can skip the costly nested pass
+            nested: false,
             scale: false,
             onEnter: els => gsap.fromTo(els, { autoAlpha: 0, scale: 0.97 }, { autoAlpha: 1, scale: 1, duration: 0.3, ease: ARRIVE }),
             onLeave: els => gsap.to(els, { autoAlpha: 0, duration: 0.15 })

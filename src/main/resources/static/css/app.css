@@ -316,8 +316,18 @@ select.control {
 .control:focus {
     border-color: var(--accent);
     box-shadow: none;
-    outline: 3px solid var(--accent-soft);
-    outline-offset: 0;
+    outline: none;
+}
+
+/* Keyboard focus must be as visible on fields as on buttons */
+.control:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* The name field suggests absent kids; the browser's arrow only adds noise */
+input[list]::-webkit-calendar-picker-indicator {
+    display: none !important;
 }
 
 .control::placeholder {
@@ -436,6 +446,10 @@ select.control {
 
 .disclosure-summary {
     flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--ink-2);
     font-weight: 400;
     font-size: 0.9375rem;
@@ -1225,6 +1239,7 @@ dialog.sheet::backdrop {
 }
 
 .pair-rules li .btn {
+    flex: 0 0 auto;
     margin-left: auto;
 }
 
@@ -1337,25 +1352,6 @@ dialog.sheet::backdrop {
     margin-left: auto;
 }
 
-#attendance .panel-head {
-    flex-wrap: wrap;
-}
-
-#attendance .panel-head h2 {
-    white-space: nowrap;
-}
-
-/* On a phone the two buttons get their own row instead of squeezing the count */
-@media (max-width: 480px) {
-    #attendance .head-actions {
-        width: 100%;
-    }
-
-    #attendance .head-actions .btn {
-        flex: 1;
-    }
-}
-
 .panel-head h2 .bi {
     color: var(--ink-2);
 }
@@ -1463,17 +1459,15 @@ dialog.sheet::backdrop {
     font-size: 1.125rem;
 }
 
-.station-toggle.is-bucket {
-    color: var(--bucket);
-}
-
+/* At rest the icons stay neutral; only an exception gets colour */
+.station-toggle.is-bucket,
 .station-toggle.is-sparring {
-    color: var(--sparring);
+    color: var(--ink-2);
 }
 
 .station-toggle[aria-pressed="true"] {
-    color: var(--line);
-    background: var(--surface-2);
+    color: var(--danger);
+    background: var(--danger-soft);
 }
 
 .station-toggle[aria-pressed="true"]::after {
@@ -1652,4 +1646,210 @@ dialog.sheet.is-closing::backdrop {
 .bucket-list,
 .exercises {
     overflow-anchor: none;
+}
+
+/* ===== Plan page during the training ===== */
+/* Room for a toast above the bar, so it never hides the last row */
+body.plan-page {
+    padding-bottom: calc(var(--actionbar-h) + 88px);
+}
+
+.topbar-plan .head-actions {
+    gap: 0;
+}
+
+/* Bottom bar: the main step is a little wider than the three tools */
+.button-row.tools > .tool-main {
+    flex: 1.3;
+}
+
+.tool-badge {
+    display: inline-block;
+    min-width: 1.25rem;
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--danger);
+    color: var(--on-accent);
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.exercise-head h2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px var(--space-2);
+    min-width: 0;
+}
+
+.ex-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px var(--space-2);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.ex-badge.is-now {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.ex-badge.is-changed {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.exercise.is-now {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 6px 20px oklch(0.46 0.14 255 / 0.12);
+}
+
+/* Played: still readable for questions afterwards, but clearly behind */
+.exercise.is-played {
+    background: var(--surface-2);
+    border-color: transparent;
+}
+
+.exercise.is-played h2 {
+    color: var(--ink-2);
+}
+
+.exercise.is-played .row {
+    background: var(--surface);
+}
+
+.exnav a.is-played {
+    background: var(--surface-2);
+    border-color: transparent;
+    color: var(--ink-2);
+}
+
+/* The running Übung keeps a dot under its number, wherever the page is scrolled */
+.exnav a.is-now::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.exnav a.is-now:not([aria-current="true"]) {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Hints by weight: broken rule, worth a look, expected */
+.hints {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    margin-top: var(--space-3);
+}
+
+.hints > .bi {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.hints ul {
+    flex: 1;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.notice-warn {
+    background: var(--sparring-soft);
+    color: var(--sparring);
+    border: 1px solid color-mix(in oklch, var(--sparring) 30%, transparent);
+}
+
+.hints-note {
+    color: var(--ink-2);
+    font-size: 0.875rem;
+    padding: 0 var(--space-1);
+}
+
+.edit-hint {
+    margin: 0 0 var(--space-3);
+}
+
+/* ===== Bottom sheets: on a phone they rise from the thumb zone ===== */
+dialog.sheet-bottom[open] {
+    display: flex;
+    flex-direction: column;
+    max-height: min(88dvh, 720px);
+    overflow: hidden;
+}
+
+.sheet-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.sheet-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.sheet-head h2 .count {
+    margin-left: var(--space-2);
+}
+
+@media (max-width: 640px) {
+    dialog.sheet-bottom {
+        width: 100%;
+        max-width: 100%;
+        margin: auto 0 0;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* ===== Entry page refinements ===== */
+.list-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    margin: 0 0 var(--space-2);
+}
+
+.summary-warn {
+    color: var(--sparring);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* The bar's content lines up with the page column above it */
+.actionbar-inner:not(.actionbar-wide) {
+    max-width: calc(640px - 2 * var(--space-4));
+}
+
+@media (min-width: 900px) {
+    .button-row.tools > .tool-main {
+        flex: 0 0 auto;
+        min-width: 11rem;
+    }
+}
+
+/* The plan's bar lines up with the cards (page width minus its side padding) */
+.actionbar-wide {
+    max-width: calc(1200px - 2 * var(--space-4));
 }

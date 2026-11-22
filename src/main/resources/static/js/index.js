@@ -668,16 +668,17 @@ function stationNumbers() {
 
 function checkStations() {
     const summary = $('stationSummary');
-    const warning = $('stationWarning');
     const { kids, atBuckets, sparring, mental, playing } = stationNumbers();
     const exercises = intValue('numberOfExercises');
     const kidNames = new Set(currentPlayers.map(p => p.name));
     const clash = sparringPartners.find(name => kidNames.has(name));
     const length = Math.max(1, intValue('mentalTrainerLength'));
     const picked = mentalPicks.filter(name => kidNames.has(name)).length;
+    // One short line: how many, and for how long
     $('mentalSummary').textContent = mental === 0
         ? 'Aus'
-        : `${mental} Kinder · ${length}×` + (picked > 0 ? ` · ${picked} gewählt` : '');
+        : `${mental} ${mental === 1 ? 'Kind' : 'Kinder'}` + (length > 1 ? ` · ${length} Übungen` : '');
+    $('toggleMental').setAttribute('aria-description', picked > 0 ? `${picked} Kinder gewählt` : '');
     renderMentalPicks();
 
     let error = null;
@@ -696,9 +697,7 @@ function checkStations() {
             warnings.push(repeats > kids ? 'Einige Kinder 2× am Balleimer.' : `${repeats} Kinder 2× am Balleimer.`);
         }
     }
-    renderStationResult(error ? 0 : exercises * (atBuckets + sparring), kids);
-    warning.hidden = warnings.length === 0;
-    warning.innerHTML = warnings.map(w => `<i class="bi bi-exclamation-circle" aria-hidden="true"></i> ${escapeHtml(w)}`).join('<br>');
+    renderStationResult(error ? 0 : exercises * (atBuckets + sparring), kids, warnings);
 
     if (error) {
         summary.className = 'stats is-error';
@@ -718,7 +717,7 @@ function checkStations() {
 }
 
 // How the Balleimer and sparring turns spread over today's kids
-function renderStationResult(places, kids) {
+function renderStationResult(places, kids, warnings = []) {
     const line = $('stationResult');
     line.hidden = places === 0 || kids === 0;
     if (line.hidden) return;
@@ -733,11 +732,15 @@ function renderStationResult(places, kids) {
         text = `${extra} Kinder ${each + 1}×, ${kids - extra} Kinder ${each}×`;
     }
     const kidNames = new Set(currentPlayers.map(p => p.name));
-    if (strongAtStations || extraStationKids.some(n => kidNames.has(n))) {
-        // Extra turns for strong or starred kids: the even split no longer holds exactly
-        text = 'Starke / ⭐ Kinder öfter, Rest gleichmässig';
+    // Extra turns for strong or starred kids: the even split no longer holds exactly.
+    // Name only what is actually switched on.
+    const starred = extraStationKids.some(n => kidNames.has(n));
+    if (strongAtStations || starred) {
+        const who = strongAtStations && starred ? 'Starke und ⭐ Kinder' : strongAtStations ? 'Starke Kinder' : '⭐ Kinder';
+        text = `${who} öfter, Rest gleichmässig`;
     }
-    line.innerHTML = `<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Stationen: ${escapeHtml(text)}`;
+    line.innerHTML = `<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Stationen: ${escapeHtml(text)}`
+        + warnings.map(w => ` <span class="summary-warn"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> ${escapeHtml(w)}</span>`).join('');
 }
 
 // ===== GENERATE =====
