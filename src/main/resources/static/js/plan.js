@@ -422,7 +422,7 @@ function renderBar() {
         next.setAttribute('aria-label', `Training starten mit ${exerciseLabel(1)}`);
         icon.className = 'bi bi-play-fill';
     } else if (now < total - 1) {
-        $('nextLabel').textContent = `Weiter: ${now + 2}`;
+        $('nextLabel').innerHTML = `Weiter: <span class="next-num">${now + 2}</span>`;
         next.setAttribute('aria-label', `${exerciseLabel(now + 1)} fertig, weiter mit ${exerciseLabel(now + 2)}`);
         icon.className = 'bi bi-skip-end-fill';
     } else if (now === total - 1) {
@@ -461,13 +461,14 @@ function advance() {
     renderNav();
     renderExercises();
     renderBar();
+    // No toast: the button itself shows the step, its number rolls up to the next Übung
+    const num = $('nextLabel').querySelector('.next-num');
+    if (num) Motion.tick(num, 1);
+    else Motion.pop($('nextLabel'));
     if (plan.now < total) {
         const card = $(`ex-${plan.now + 1}`);
         Motion.scrollTo(card);
         Motion.pop(card.querySelector('.ex-badge'));
-        toast(`${exerciseLabel(plan.now + 1)} läuft`, { label: 'Rückgängig', run: undo });
-    } else {
-        toast('Training beendet', { label: 'Rückgängig', run: undo });
     }
 }
 

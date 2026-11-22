@@ -1853,3 +1853,10 @@ dialog.sheet-bottom[open] {
 .actionbar-wide {
     max-width: calc(1200px - 2 * var(--space-4));
 }
+
+/* The number in "Weiter: 3" rolls when the training moves on */
+.next-num,
+#nextLabel {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+}
