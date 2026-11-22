@@ -2547,3 +2547,37 @@ dialog.focus-dialog::backdrop {
 .player-list li {
     padding-block: 6px;
 }
+
+/* ===== One name for undo: "Rückgängig", with its icon, everywhere ===== */
+@media (max-width: 899px) {
+    .button-row.tools > .tool-icon {
+        flex: 0 0 76px;
+    }
+
+    .button-row.tools > .tool-icon .tool-label {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip-path: none;
+        font-size: 0.75rem;
+    }
+}
+
+.focus-foot #focusUndo {
+    flex-basis: 72px;
+}
+
+.focus-foot #focusJoin {
+    flex-basis: 78px;
+}
+
+.focus-foot .focus-tool span {
+    font-size: 0.75rem;
+}
+
+@media (max-width: 599px) {
+    .focus-next {
+        font-size: 0.9375rem;
+    }
+}

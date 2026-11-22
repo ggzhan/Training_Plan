@@ -94,8 +94,9 @@ function restore(state) {
     plan.now = state.now;
 }
 
-function pushHistory() {
-    historyStack.push(snapshot());
+// label names the step for the undo toast ("Start von Übung 2 rückgängig")
+function pushHistory(label = '') {
+    historyStack.push({ ...snapshot(), label });
     redoStack = [];
     changedCards = new Set();
 }
@@ -104,22 +105,24 @@ function undo() {
     if (historyStack.length === 0 || busy) return;
     cancelEdit();
     const before = plan.exercises;
-    redoStack.push(snapshot());
-    restore(historyStack.pop());
+    const state = historyStack.pop();
+    redoStack.push({ ...snapshot(), label: state.label });
+    restore(state);
     savePlan();
     renderWithFlip(before);
-    toast('Rückgängig gemacht', { label: 'Wiederholen', run: redo });
+    toast(state.label ? `${state.label} rückgängig` : 'Rückgängig gemacht', { label: 'Wiederholen', run: redo });
 }
 
 function redo() {
     if (redoStack.length === 0 || busy) return;
     cancelEdit();
     const before = plan.exercises;
-    historyStack.push(snapshot());
-    restore(redoStack.pop());
+    const state = redoStack.pop();
+    historyStack.push({ ...snapshot(), label: state.label });
+    restore(state);
     savePlan();
     renderWithFlip(before);
-    toast('Wiederhergestellt', { label: 'Rückgängig', run: undo });
+    toast(state.label ? `${state.label} wiederhergestellt` : 'Wiederhergestellt', { label: 'Rückgängig', run: undo });
 }
 
 // ===== PLACES =====
@@ -611,7 +614,8 @@ function advance() {
     const total = plan.exercises.length;
     const now = nowIndex();
     if (now !== null && now >= total) return;
-    pushHistory();
+    pushHistory(now === null ? `Start von ${exerciseLabel(1)}`
+        : now === total - 1 ? 'Trainingsende' : `Start von ${exerciseLabel(now + 2)}`);
     const starting = now === null;
     plan.now = now === null ? 0 : now + 1;
     savePlan();
@@ -681,7 +685,7 @@ function saveEdit({ quiet = false } = {}) {
     const index = editingIndex;
     const changed = JSON.stringify(draft) !== JSON.stringify(plan.exercises[index]);
     if (changed) {
-        pushHistory();
+        pushHistory(`Änderung an ${exerciseLabel(index + 1)}`);
         plan.exercises[index] = draft;
         savePlan();
     }
@@ -723,7 +727,7 @@ function renderWithFlip(beforeExercises) {
 
 // ===== SERVER: RE-PLAN =====
 // Keeps exercises 1..keepThrough+1 and lets the server plan the rest
-function replan(nextPlan, keepThrough) {
+function replan(nextPlan, keepThrough, label = '') {
     busy = true;
     renderBar();
     return fetch('/api/regenerate-exercises', {
@@ -734,7 +738,7 @@ function replan(nextPlan, keepThrough) {
         .then(readJsonResponse)
         .then(data => {
             const before = plan.exercises;
-            pushHistory();
+            pushHistory(label);
             plan.players = nextPlan.players;
             plan.absent = nextPlan.absent;
             plan.exercises = data.exercises;
@@ -761,7 +765,7 @@ function regenerateFollowing() {
     if (busy || editingIndex === null) return;
     const index = editingIndex;
     saveEdit({ quiet: true });
-    replan(clone(plan), index)
+    replan(clone(plan), index, 'Neueinteilung')
         .then(() => toast(`Übungen ab ${index + 2} neu eingeteilt${unpairedNote(index + 1)}`, { label: 'Rückgängig', run: undo }))
         .catch(error => toast('Neu einteilen ging nicht. ' + friendlyError(error)));
 }
@@ -876,7 +880,7 @@ function applyAttendance() {
 
     $('applyAttendance').disabled = true;
     const before = new Set(plan.players.map(p => p.name));
-    replan(next, from - 2)
+    replan(next, from - 2, 'Anpassung «Wer geht?»')
         .then(() => {
             // Stay on the running card; the changed ones say "Neu eingeteilt"
             closeAttendance();
@@ -1023,7 +1027,7 @@ function confirmAddKid(event) {
     next.settings.mentalTrainerKids = parseInt($('addKidMental').value, 10) || 0;
 
     $('confirmAddKid').disabled = true;
-    replan(next, from - 2)
+    replan(next, from - 2, `${name} dazu`)
         .then(() => {
             Motion.closeDialog($('addKidDialog'));
             toast(`${name} ab ${exerciseLabel(from)} dabei${unpairedNote(from - 1)}`, { label: 'Rückgängig', run: undo });
