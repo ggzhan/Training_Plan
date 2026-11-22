@@ -46,7 +46,7 @@ function loadPlayers({ fromSheet = false } = {}) {
             if (fromSheet) removeStored(STORAGE_KEYS.roster);
             setPlayers(players, false);
         })
-        .catch(error => showFormError('Die Anmeldungen konnten nicht geladen werden. ' + error.message));
+        .catch(error => showFormError('Die Anmeldungen konnten nicht geladen werden. ' + friendlyError(error)));
 }
 
 function setPlayers(players, edited) {
@@ -69,7 +69,7 @@ function refreshFromSheet() {
         .then(readJsonResponse)
         .then(() => loadPlayers({ fromSheet: true }))
         .then(() => toast(`${currentPlayers.length} Kinder aus dem Sheet geladen`))
-        .catch(error => showFormError('Das Sheet konnte nicht neu geladen werden. ' + error.message))
+        .catch(error => showFormError('Das Sheet konnte nicht neu geladen werden. ' + friendlyError(error)))
         .finally(() => { btn.disabled = false; });
 }
 
@@ -423,6 +423,10 @@ function renderBalleimer() {
         item.querySelector('input').addEventListener('change', (e) => setBucketSize(index, parseInt(e.target.value, 10)));
         list.appendChild(item);
     });
+    // First run: say what happens without stations, and make adding one the obvious step
+    const empty = balleimerSizes.length === 0;
+    if (empty) list.innerHTML = '<li class="empty">Kein Balleimer – alle spielen in Paaren.</li>';
+    $('addBucketBtn').className = empty ? 'btn btn-secondary' : 'btn btn-quiet';
     $('addBucketBtn').disabled = balleimerSizes.length >= MAX_BALLEIMER;
 }
 
@@ -496,6 +500,7 @@ function renderSparringPartners() {
         chip.querySelector('button').addEventListener('click', () => removeSparringPartner(index));
         list.appendChild(chip);
     });
+    $('sparringEmpty').hidden = sparringPartners.length > 0;
 }
 
 // ===== RULES =====
@@ -637,9 +642,10 @@ function setOpen(buttonId, bodyId, open, animate = true) {
 }
 
 // ===== FEASIBILITY =====
+// Icon, number and a short word: readable without remembering what each icon means
 function stat(icon, value, label, extraClass = '') {
-    return `<span class="stat ${extraClass}" title="${escapeHtml(label)}" data-key="${icon}"><i class="bi ${icon}" aria-hidden="true"></i>`
-        + ` <span class="stat-value">${escapeHtml(String(value))}</span><span class="visually-hidden"> ${escapeHtml(label)}</span></span>`;
+    return `<span class="stat ${extraClass}" data-key="${icon}"><i class="bi ${icon}" aria-hidden="true"></i>`
+        + ` <span class="stat-value">${escapeHtml(String(value))}</span> <span class="stat-label">${escapeHtml(label)}</span></span>`;
 }
 
 // After the stats re-render, numbers that changed tick up or down; new stats fade in
@@ -705,9 +711,9 @@ function checkStations() {
     } else {
         const pairs = Math.floor(playing / 2);
         let html = stat('bi-people', kids, 'Kinder') + stat('bi-arrow-left-right', pairs, pairs === 1 ? 'Paar' : 'Paare');
-        if (atBuckets > 0) html += stat('bi-basket', atBuckets, 'am Balleimer', 'is-bucket');
-        if (sparring > 0) html += stat('bi-person-badge', sparring, 'im Sparring', 'is-sparring');
-        if (mental > 0) html += stat('bi-lightbulb', mental, 'beim Mentaltrainer', 'is-mental');
+        if (atBuckets > 0) html += stat('bi-basket', atBuckets, 'Balleimer', 'is-bucket');
+        if (sparring > 0) html += stat('bi-person-badge', sparring, 'Sparring', 'is-sparring');
+        if (mental > 0) html += stat('bi-lightbulb', mental, 'Mental', 'is-mental');
         if (playing % 2 === 1) html += stat('bi-exclamation-triangle-fill', 1, 'ohne Partner', 'is-warn');
         summary.className = 'stats';
         summary.innerHTML = html;
@@ -812,7 +818,7 @@ function createPlan() {
             window.location.href = '/plan';
         })
         .catch(error => {
-            showFormError(error.message);
+            showFormError(friendlyError(error));
             button.textContent = 'Plan erstellen';
             checkStations();
         });

@@ -7,7 +7,7 @@
     <title>Trainingsplan</title>
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3e%3ccircle cx='16' cy='16' r='14' fill='%233157b8'/%3e%3ccircle cx='21' cy='11' r='4' fill='white'/%3e%3c/svg%3e">
     <link rel="stylesheet" th:href="@{/vendor/bootstrap-icons/icons.css(v=1)}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=17)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=18)}">
 </head>
 
 <body class="plan-page">
@@ -51,8 +51,6 @@
             <div id="editBar" class="button-row tools" hidden>
                 <button type="button" id="cancelEdit" class="btn btn-secondary">
                     <i class="bi bi-x-lg" aria-hidden="true"></i> <span>Abbrechen</span></button>
-                <button type="button" id="regenerateBtn" class="btn btn-secondary">
-                    <i class="bi bi-shuffle" aria-hidden="true"></i> <span id="regenerateLabel">Rest neu</span></button>
                 <button type="button" id="saveEdit" class="btn btn-primary tool-main">
                     <i class="bi bi-check-lg" aria-hidden="true"></i> <span>Speichern</span></button>
             </div>
@@ -78,6 +76,8 @@
                 <select id="applyFrom" class="control"></select>
             </div>
             <p class="info" id="applyHint"></p>
+            <p class="info is-warn" id="applyOdd" hidden></p>
+            <button type="button" id="missingFix" class="btn btn-secondary btn-wrap" hidden></button>
             <button type="button" id="applyAttendance" class="btn btn-primary btn-lg" disabled>Anpassen</button>
         </div>
     </dialog>
@@ -133,12 +133,13 @@
     </dialog>
 
     <div id="toast" class="toast-host" role="status" aria-live="polite"></div>
+    <p id="srStatus" class="visually-hidden" role="status" aria-live="polite"></p>
 
     <script th:src="@{/vendor/gsap.min.js}"></script>
     <script th:src="@{/vendor/Flip.min.js}"></script>
     <script th:src="@{/js/motion.js(v=2)}"></script>
-    <script th:src="@{/js/common.js(v=4)}"></script>
-    <script th:src="@{/js/plan.js(v=12)}"></script>
+    <script th:src="@{/js/common.js(v=5)}"></script>
+    <script th:src="@{/js/plan.js(v=13)}"></script>
 </body>
 
 </html>

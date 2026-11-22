@@ -96,6 +96,12 @@ function trackActionBar() {
     update();
 }
 
+// What to tell the trainer when a request fails: no network, or the server's own message
+function friendlyError(error) {
+    if (error instanceof TypeError) return 'Keine Verbindung zum Server. Netz prüfen und nochmals versuchen.';
+    return (error && error.message) || 'Bitte nochmals versuchen.';
+}
+
 // Server errors come back as {error: "..."}; anything else gets a generic message
 async function readJsonResponse(response) {
     let data = null;

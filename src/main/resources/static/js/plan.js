@@ -145,27 +145,6 @@ function slotsOf(ex) {
     return slots;
 }
 
-function changeSlot(slotIndex, name) {
-    const slots = slotsOf(draft);
-    const target = slots[slotIndex];
-    const previous = target.get();
-    const chosen = playerByName(name);
-    const holderIndex = slots.findIndex((s, i) => i !== slotIndex && s.get().name === name);
-    const holder = holderIndex === -1 ? null : slots[holderIndex];
-    target.set(chosen);
-    if (holder) holder.set(previous);
-    renderExercises();
-    // Keep focus on the select that was just changed
-    const again = document.querySelector(`select[data-slot="${slotIndex}"]`);
-    if (again) again.focus();
-    if (holder) {
-        // Both places light up, so the swap is visible
-        Motion.flash(again);
-        Motion.flash(document.querySelector(`select[data-slot="${holderIndex}"]`));
-        toast(`${previous.name} und ${name} getauscht`);
-    }
-}
-
 // ===== RULE HINTS =====
 // What this exercise breaks or repeats; recomputed after every change.
 // "rule": a setting is broken (red). "warn": worth a look (amber).
@@ -248,7 +227,8 @@ function render() {
     plan.absent = (plan.absent || []).map(withElo);
     plan.exercises.forEach(ex => { ex.mentalTrainer = ex.mentalTrainer || []; });
 
-    $('planTitle').textContent = plan.trainingDate ? `Training ${plan.trainingDate}` : 'Trainingsplan';
+    // "5. Dezember" stays on one line
+    $('planTitle').textContent = plan.trainingDate ? `Training ${plan.trainingDate.replace(/ /g, '\u00a0')}` : 'Trainingsplan';
     document.title = plan.trainingDate ? `Trainingsplan ${plan.trainingDate}` : 'Trainingsplan';
     const s = plan.settings;
     const meta = [`${plan.players.length} Kinder`];
@@ -277,8 +257,9 @@ function renderNav() {
     nav.innerHTML = '<span class="exnav-indicator" aria-hidden="true"></span>' + plan.exercises.map((_, i) => {
         const state = i === now ? ' is-now' : isPlayed(i) ? ' is-played' : '';
         const note = i === now ? ', läuft jetzt' : isPlayed(i) ? ', gespielt' : '';
-        return `<a href="#ex-${i + 1}" class="${state.trim()}" aria-label="${exerciseLabel(i + 1)}${note}"`
-            + `${i === currentIndex ? ' aria-current="true"' : ''}>${i + 1}</a>`;
+        const here = i === currentIndex ? ' is-here' : '';
+        return `<a href="#ex-${i + 1}" class="${(state + here).trim()}" aria-label="${exerciseLabel(i + 1)}${note}"`
+            + `${i === now ? ' aria-current="step"' : ''}>${i + 1}</a>`;
     }).join('');
     Motion.slideTo(nav.querySelector('.exnav-indicator'), nav.querySelectorAll('a')[currentIndex], true);
 }
@@ -343,45 +324,59 @@ function renderViewCard(ex, index) {
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} ${badge}</h2>
             <button type="button" class="btn btn-quiet" aria-label="${exerciseLabel(index + 1)} bearbeiten">
-                <i class="bi bi-pencil" aria-hidden="true"></i> Bearbeiten</button>
+                <i class="bi bi-pencil" aria-hidden="true"></i> <span class="btn-label">Bearbeiten</span></button>
         </div>${body}`;
     section.querySelector('.exercise-head button').addEventListener('click', () => startEdit(index));
     return section;
 }
 
+// Editing: every kid of the Übung is a button. Tap one, then the one to swap
+// with; both change places. Every kid already has a place in each Übung, so
+// swapping covers every change a select could make.
+let pickedSlot = null;
+
 function renderEditCard(index) {
-    const players = [...plan.players].sort((a, b) => a.name.localeCompare(b.name));
     let slot = 0;
-    const select = (current, label) => {
+    const kid = (current, label) => {
         const i = slot++;
-        const options = players.map(p =>
-            `<option value="${escapeHtml(p.name)}"${p.name === current.name ? ' selected' : ''}>`
-            + `${escapeHtml(p.name)} (${p.elo})</option>`).join('');
-        return `<select class="control" data-slot="${i}" aria-label="${escapeHtml(label)}">${options}</select>`;
+        const picked = i === pickedSlot;
+        return `<button type="button" class="slot-btn" data-slot="${i}" aria-pressed="${picked}"`
+            + ` aria-label="${escapeHtml(label)}: ${escapeHtml(current.name)}">`
+            + `<span class="slot-name" data-flip-id="${escapeHtml(current.name)}">${escapeHtml(current.name)}</span>`
+            + `<span class="slot-elo">${current.elo}</span></button>`;
     };
 
-    let body = '<p class="info edit-hint">Kind wählen – wer den Platz hatte, tauscht mit.</p>';
+    const total = plan.exercises.length;
+    const hint = pickedSlot === null
+        ? 'Zwei Kinder nacheinander antippen – sie tauschen die Plätze.'
+        : 'Jetzt das Kind antippen, mit dem getauscht wird.';
+    let body = `<p class="info edit-hint" id="editHint">${hint}</p>`;
     draft.pairs.forEach((p, n) => {
-        body += `<div class="slot-group"><span class="tag">Paar ${n + 1}</span>
-            ${select(p.player1, `Paar ${n + 1}, erstes Kind`)}${select(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
+        body += `<div class="slot-group slot-pair"><span class="tag">Paar ${n + 1}</span>
+            ${kid(p.player1, `Paar ${n + 1}, erstes Kind`)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
     });
     if (draft.mentalTrainer.length > 0) {
         body += `<div class="slot-group row-mental"><span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer</span>
-            ${draft.mentalTrainer.map((p, k) => select(p, `Mentaltrainer, Kind ${k + 1}`)).join('')}</div>`;
+            ${draft.mentalTrainer.map((p, k) => kid(p, `Mentaltrainer, Kind ${k + 1}`)).join('')}</div>`;
     }
     draft.balleimer.forEach((bucket, b) => {
         body += `<div class="slot-group row-bucket"><span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span>
-            ${bucket.map((p, k) => select(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;
+            ${bucket.map((p, k) => kid(p, `Balleimer ${b + 1}, Kind ${k + 1}`)).join('')}</div>`;
     });
     draft.sparring.forEach(sp => {
         body += `<div class="slot-group row-sparring"><span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
-            ${select(sp.player, `Sparring mit ${sp.partner}`)}</div>`;
+            ${kid(sp.player, `Sparring mit ${sp.partner}`)}</div>`;
     });
     if (draft.unpaired.length > 0) {
         body += `<div class="slot-group"><span class="tag">Ohne Partner</span>
-            ${draft.unpaired.map((p, k) => select(p, `Ohne Partner, Kind ${k + 1}`)).join('')}</div>`;
+            ${draft.unpaired.map((p, k) => kid(p, `Ohne Partner, Kind ${k + 1}`)).join('')}</div>`;
     }
     body += hintsHtml(index, draft);
+    if (index + 1 < total) {
+        const rest = index + 2 === total ? `Übung ${total}` : `Übungen ${index + 2}–${total}`;
+        body += `<button type="button" class="btn btn-quiet btn-block btn-wrap regen-btn" id="regenerateBtn"${busy ? ' disabled' : ''}>
+            <i class="bi bi-shuffle" aria-hidden="true"></i> Speichern und ${rest} neu einteilen</button>`;
+    }
 
     const section = document.createElement('section');
     section.className = 'exercise is-editing';
@@ -392,9 +387,51 @@ function renderEditCard(index) {
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} <span class="visually-hidden">bearbeiten</span></h2>
         </div>${body}`;
-    section.querySelectorAll('select[data-slot]').forEach(el =>
-        el.addEventListener('change', () => changeSlot(parseInt(el.dataset.slot, 10), el.value)));
+    section.querySelectorAll('.slot-btn').forEach(el =>
+        el.addEventListener('click', () => tapSlot(parseInt(el.dataset.slot, 10))));
+    const regen = section.querySelector('#regenerateBtn');
+    if (regen) regen.addEventListener('click', regenerateFollowing);
     return section;
+}
+
+function tapSlot(slotIndex) {
+    if (pickedSlot === null) {
+        pickedSlot = slotIndex;
+        rerenderEdit(slotIndex);
+        return;
+    }
+    if (pickedSlot === slotIndex) {
+        pickedSlot = null;
+        rerenderEdit(slotIndex);
+        return;
+    }
+    const slots = slotsOf(draft);
+    const first = pickedSlot;
+    const a = slots[first].get();
+    const b = slots[slotIndex].get();
+    slots[first].set(b);
+    slots[slotIndex].set(a);
+    pickedSlot = null;
+    // Both names glide to their new place
+    Motion.flip(`#ex-${editingIndex + 1} .slot-name`, () => rerenderEdit(slotIndex));
+    Motion.flash(document.querySelector(`.slot-btn[data-slot="${first}"]`));
+    Motion.flash(document.querySelector(`.slot-btn[data-slot="${slotIndex}"]`));
+    announce(`${a.name} und ${b.name} getauscht`);
+}
+
+function rerenderEdit(focusSlot) {
+    const old = $(`ex-${editingIndex + 1}`);
+    old.replaceWith(renderEditCard(editingIndex));
+    const again = document.querySelector(`.slot-btn[data-slot="${focusSlot}"]`);
+    if (again) again.focus({ preventScroll: true });
+}
+
+// Quiet status for screen readers, without a toast on screen
+function announce(message) {
+    const el = $('srStatus');
+    if (!el) return;
+    el.textContent = '';
+    requestAnimationFrame(() => { el.textContent = message; });
 }
 
 function renderBar() {
@@ -436,16 +473,6 @@ function renderBar() {
     }
     next.disabled = busy || (now !== null && now >= total);
 
-    if (editing) {
-        const n = editingIndex + 1;
-        const regen = $('regenerateBtn');
-        regen.hidden = n === total;
-        $('regenerateLabel').textContent = n + 1 === total ? `Übung ${total} neu` : `Ab ${n + 1} neu`;
-        regen.setAttribute('aria-label', n + 1 === total
-            ? `Speichern und Übung ${total} neu einteilen`
-            : `Speichern und Übungen ${n + 1}–${total} neu einteilen`);
-        regen.disabled = busy;
-    }
 }
 
 // One tap per Übung: the trainer always sees what is on now, and changes start after it
@@ -488,12 +515,11 @@ function observeExercises() {
         if (top !== currentIndex) {
             currentIndex = top;
             document.querySelectorAll('#exnavInner a').forEach((a, i) => {
+                // Scroll position is only a thin underline; the filled chip belongs to "Jetzt"
+                a.classList.toggle('is-here', i === currentIndex);
                 if (i === currentIndex) {
-                    a.setAttribute('aria-current', 'true');
                     a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                     Motion.slideTo(document.querySelector('#exnavInner .exnav-indicator'), a);
-                } else {
-                    a.removeAttribute('aria-current');
                 }
             });
         }
@@ -505,13 +531,14 @@ function observeExercises() {
 function startEdit(index) {
     if (editingIndex !== null) saveEdit();
     editingIndex = index;
+    pickedSlot = null;
     draft = clone(plan.exercises[index]);
     renderExercises();
     renderBar();
     const card = $(`ex-${index + 1}`);
     Motion.scrollTo(card);
     Motion.enter(card.querySelectorAll('.slot-group'));
-    const first = card.querySelector('select');
+    const first = card.querySelector('.slot-btn');
     if (first) first.focus({ preventScroll: true });
 }
 
@@ -588,13 +615,19 @@ function replan(nextPlan, keepThrough) {
         });
 }
 
+// " · 1 ohne Partner" when the re-planned Übungen leave someone alone
+function unpairedNote(fromIndex) {
+    const alone = plan.exercises.slice(Math.max(0, fromIndex)).some(ex => ex.unpaired.length > 0);
+    return alone ? ' · 1 Kind ohne Partner' : '';
+}
+
 function regenerateFollowing() {
     if (busy || editingIndex === null) return;
     const index = editingIndex;
     saveEdit({ quiet: true });
     replan(clone(plan), index)
-        .then(() => toast(`Übungen ab ${index + 2} neu eingeteilt`, { label: 'Rückgängig', run: undo }))
-        .catch(error => toast('Neu einteilen ging nicht: ' + error.message));
+        .then(() => toast(`Übungen ab ${index + 2} neu eingeteilt${unpairedNote(index + 1)}`, { label: 'Rückgängig', run: undo }))
+        .catch(error => toast('Neu einteilen ging nicht. ' + friendlyError(error)));
 }
 
 // ===== ATTENDANCE =====
@@ -607,7 +640,7 @@ function allKids() {
 function openAttendance() {
     if (busy) return;
     if (editingIndex !== null) saveEdit({ quiet: true });
-    attendance = { present: new Set(plan.players.map(p => p.name)), added: [] };
+    attendance = { present: new Set(plan.players.map(p => p.name)), added: [], sizes: [...(plan.settings.balleimerSizes || [])] };
     $('applyFrom').innerHTML = fromOptions('ab ');
     $('applyFrom').value = String(firstOpenExercise());
     renderAttendance();
@@ -624,6 +657,7 @@ function attendanceChanged() {
     const before = new Set(plan.players.map(p => p.name));
     if (attendance.added.length > 0) return true;
     if (before.size !== attendance.present.size) return true;
+    if (JSON.stringify(attendance.sizes) !== JSON.stringify(plan.settings.balleimerSizes || [])) return true;
     return [...before].some(name => !attendance.present.has(name));
 }
 
@@ -658,6 +692,30 @@ function renderAttendance() {
     const missing = allKids().length - attendance.present.size;
     $('applyHint').textContent = (missing === 0 ? 'Alle da. ' : `${missing} ${missing === 1 ? 'fehlt' : 'fehlen'}. `)
         + (from === 1 ? 'Alle Übungen werden neu eingeteilt.' : `Übung 1${from > 2 ? `–${from - 1}` : ''} bleibt wie sie ist.`);
+
+    // Say before applying when someone would be left without a partner, and offer the fix
+    const atBuckets = attendance.sizes.reduce((sum, size) => sum + size, 0);
+    const playing = attendance.present.size - atBuckets - plan.settings.sparringPartners.length
+        - (plan.settings.mentalTrainerKids || 0);
+    const odd = $('applyOdd');
+    const fix = oddFix(attendance.sizes, playing);
+    if (playing < 0) {
+        odd.textContent = `Zu wenige Kinder für alle Stationen (${attendance.present.size} da, ${attendance.present.size - playing} Plätze).`;
+        apply.disabled = true;
+    } else if (playing % 2 === 1) {
+        odd.textContent = 'Dann bleibt pro Übung 1 Kind ohne Partner.';
+    }
+    odd.hidden = playing >= 0 && playing % 2 === 0;
+    const fixBtn = $('missingFix');
+    fixBtn.hidden = !fix;
+    if (fix) {
+        fixBtn.textContent = fix.label;
+        fixBtn.onclick = () => {
+            fix.apply(attendance.sizes);
+            renderAttendance();
+            announce(fix.label);
+        };
+    }
 }
 
 function applyAttendance() {
@@ -667,6 +725,7 @@ function applyAttendance() {
     const next = clone(plan);
     next.players = kids.filter(k => attendance.present.has(k.name));
     next.absent = kids.filter(k => !attendance.present.has(k.name));
+    next.settings.balleimerSizes = [...attendance.sizes];
     if (next.players.length < 2) {
         $('applyHint').textContent = 'Mindestens zwei Kinder müssen da sein.';
         Motion.shake($('applyHint'));
@@ -678,10 +737,10 @@ function applyAttendance() {
         .then(() => {
             closeAttendance();
             Motion.scrollTo($(`ex-${from}`));
-            toast(`Plan ab ${exerciseLabel(from)} angepasst`, { label: 'Rückgängig', run: undo });
+            toast(`Plan ab ${exerciseLabel(from)} angepasst${unpairedNote(from - 1)}`, { label: 'Rückgängig', run: undo });
         })
         .catch(error => {
-            $('applyHint').textContent = 'Anpassen ging nicht: ' + error.message;
+            $('applyHint').textContent = 'Anpassen ging nicht. ' + friendlyError(error);
             renderAttendance();
         });
 }
@@ -744,12 +803,12 @@ function renderAddKid() {
         stats.className = 'stats is-error';
         stats.textContent = `Zu viele Plätze: ${kids - playing} pro Übung, aber nur ${kids} Kinder.`;
     } else {
-        const item = (icon, value, label, cls = '') => `<span class="stat ${cls}" title="${label}">`
-            + `<i class="bi ${icon}" aria-hidden="true"></i> ${value}<span class="visually-hidden"> ${label}</span></span>`;
+        const item = (icon, value, label, cls = '') => `<span class="stat ${cls}">`
+            + `<i class="bi ${icon}" aria-hidden="true"></i> ${value} <span class="stat-label">${label}</span></span>`;
         let html = item('bi-people', kids, 'Kinder') + item('bi-arrow-left-right', Math.floor(playing / 2), 'Paare');
-        if (atBuckets > 0) html += item('bi-basket', atBuckets, 'am Balleimer', 'is-bucket');
-        if (sparring > 0) html += item('bi-person-badge', sparring, 'im Sparring', 'is-sparring');
-        if (mental > 0) html += item('bi-lightbulb', mental, 'beim Mentaltrainer', 'is-mental');
+        if (atBuckets > 0) html += item('bi-basket', atBuckets, 'Balleimer', 'is-bucket');
+        if (sparring > 0) html += item('bi-person-badge', sparring, 'Sparring', 'is-sparring');
+        if (mental > 0) html += item('bi-lightbulb', mental, 'Mental', 'is-mental');
         if (playing % 2 === 1) html += item('bi-exclamation-triangle-fill', 1, 'ohne Partner', 'is-warn');
         stats.className = 'stats';
         stats.innerHTML = html;
@@ -760,24 +819,26 @@ function renderAddKid() {
     $('confirmAddKid').disabled = playing < 0 || busy;
 }
 
-// With an odd number one kid would stand alone: offer the one-tap fix
+// With an odd number one kid would stand alone: the one-tap fix puts one more
+// kid at a Balleimer. Returns {label, apply(sizes)} or null.
+function oddFix(sizes, playing) {
+    if (playing < 0 || playing % 2 === 0) return null;
+    const open = sizes.map((size, i) => ({ size, i })).filter(b => b.size < MAX_PER_BALLEIMER)
+        .sort((x, y) => x.size - y.size)[0];
+    if (open) {
+        return { label: `Balleimer ${open.i + 1}: 1 Kind mehr (${open.size} → ${open.size + 1})`, apply: list => { list[open.i] += 1; } };
+    }
+    if (sizes.length < MAX_BALLEIMER) return { label: 'Balleimer mit 1 Kind dazu', apply: list => { list.push(1); } };
+    return null;
+}
+
 let addKidFixAction = null;
 function renderAddKidFix(playing) {
     const fix = $('addKidFix');
-    addKidFixAction = null;
-    if (playing >= 0 && playing % 2 === 1) {
-        // Smallest Balleimer that can take one more
-        const open = addKidSizes.map((size, i) => ({ size, i })).filter(b => b.size < MAX_PER_BALLEIMER)
-            .sort((x, y) => x.size - y.size)[0];
-        if (open) {
-            fix.textContent = `Balleimer ${open.i + 1}: 1 Kind mehr (${open.size} → ${open.size + 1})`;
-            addKidFixAction = () => { addKidSizes[open.i] += 1; };
-        } else if (addKidSizes.length < MAX_BALLEIMER) {
-            fix.textContent = 'Balleimer mit 1 Kind dazu';
-            addKidFixAction = () => { addKidSizes.push(1); };
-        }
-    }
-    fix.hidden = !addKidFixAction;
+    const found = oddFix(addKidSizes, playing);
+    addKidFixAction = found ? () => found.apply(addKidSizes) : null;
+    if (found) fix.textContent = found.label;
+    fix.hidden = !found;
 }
 
 function confirmAddKid(event) {
@@ -807,11 +868,11 @@ function confirmAddKid(event) {
     replan(next, from - 2)
         .then(() => {
             Motion.closeDialog($('addKidDialog'));
-            toast(`${name} ab ${exerciseLabel(from)} dabei`, { label: 'Rückgängig', run: undo });
+            toast(`${name} ab ${exerciseLabel(from)} dabei${unpairedNote(from - 1)}`, { label: 'Rückgängig', run: undo });
             const target = $(`ex-${from}`);
             Motion.scrollTo(target);
         })
-        .catch(e => showError('Hinzufügen ging nicht: ' + e.message))
+        .catch(e => showError('Hinzufügen ging nicht. ' + friendlyError(e)))
         .finally(() => renderAddKid());
 }
 
@@ -856,7 +917,6 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pdfBtn').addEventListener('click', exportPdf);
     $('saveEdit').addEventListener('click', () => saveEdit());
     $('cancelEdit').addEventListener('click', cancelEdit);
-    $('regenerateBtn').addEventListener('click', regenerateFollowing);
 
     $('missingBtn').addEventListener('click', openAttendance);
     $('closeMissing').addEventListener('click', closeAttendance);

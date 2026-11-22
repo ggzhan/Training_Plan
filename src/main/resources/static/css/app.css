@@ -747,12 +747,6 @@ h3.field-label {
     font-variant-numeric: tabular-nums;
 }
 
-.exnav a[aria-current="true"] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--on-accent);
-}
-
 .exercises {
     display: grid;
     gap: var(--space-4);
@@ -1572,12 +1566,12 @@ dialog.sheet::backdrop {
 
 .exnav-indicator {
     position: absolute;
-    top: var(--space-2);
+    top: calc(var(--space-2) + var(--tap) + 3px);
     left: 0;
     width: var(--tap);
-    height: var(--tap);
-    border-radius: var(--radius-sm);
-    background: var(--accent);
+    height: 3px;
+    border-radius: 2px;
+    background: var(--ink);
     opacity: 0;
     pointer-events: none;
 }
@@ -1587,10 +1581,7 @@ dialog.sheet::backdrop {
     z-index: 1;
 }
 
-.exnav a[aria-current="true"] {
-    background: transparent;
-    border-color: var(--accent);
-}
+
 
 /* Dialog backdrop fades with the dialog */
 dialog.sheet[open]::backdrop {
@@ -1713,18 +1704,18 @@ body.plan-page {
     box-shadow: 0 0 0 1px var(--accent), 0 6px 20px oklch(0.46 0.14 255 / 0.12);
 }
 
-/* Played: still readable for questions afterwards, but clearly behind */
+/* Played: still readable for questions afterwards, but quieter than the running card */
 .exercise.is-played {
-    background: var(--surface-2);
-    border-color: transparent;
+    border-style: dashed;
 }
 
-.exercise.is-played h2 {
+.exercise.is-played h2,
+.exercise.is-played .row .who {
     color: var(--ink-2);
 }
 
-.exercise.is-played .row {
-    background: var(--surface);
+.exercise.is-played .row .who {
+    font-weight: 500;
 }
 
 .exnav a.is-played {
@@ -1733,22 +1724,12 @@ body.plan-page {
     color: var(--ink-2);
 }
 
-/* The running Übung keeps a dot under its number, wherever the page is scrolled */
-.exnav a.is-now::after {
-    content: "";
-    position: absolute;
-    bottom: 4px;
-    left: 50%;
-    width: 6px;
-    height: 6px;
-    margin-left: -3px;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.exnav a.is-now:not([aria-current="true"]) {
-    color: var(--accent);
+/* The running Übung is the one filled chip, wherever the page is scrolled;
+   the scroll position is only the thin line underneath */
+.exnav a.is-now {
+    background: var(--accent);
     border-color: var(--accent);
+    color: var(--on-accent);
 }
 
 /* Hints by weight: broken rule, worth a look, expected */
@@ -1859,4 +1840,106 @@ dialog.sheet-bottom[open] {
 #nextLabel {
     display: inline-block;
     font-variant-numeric: tabular-nums;
+}
+
+/* ===== Tap-to-swap editing ===== */
+.slot-group.slot-pair {
+    grid-template-columns: 1fr 1fr;
+}
+
+.slot-group.slot-pair .tag {
+    grid-column: 1 / -1;
+}
+
+.slot-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    min-height: var(--tap);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease-out, border-color 150ms ease-out, scale 150ms ease-out;
+}
+
+.slot-btn:active {
+    scale: 0.97;
+}
+
+.slot-name {
+    display: inline-block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.slot-elo {
+    flex: 0 0 auto;
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.slot-btn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.slot-btn[aria-pressed="true"] .slot-elo {
+    color: var(--on-accent);
+}
+
+.regen-btn {
+    margin-top: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .slot-btn:active {
+        scale: none;
+    }
+}
+
+/* Stats carry a word, not only an icon */
+.stat-label {
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+/* Kid rows: a little air between the four toggles against mis-taps */
+.player-list li {
+    gap: var(--space-1);
+}
+
+.player-list li .btn-icon + .btn-icon {
+    margin-left: 2px;
+}
+
+/* Phones: the edit button keeps its icon, so the Übung badge fits next to the title */
+@media (max-width: 480px) {
+    .exercise-head .btn-label {
+        display: none;
+    }
+
+    .exercise-head .btn-quiet {
+        width: var(--tap);
+        padding: 0;
+    }
+}
+
+/* The empty-state line is text, not a list row */
+.bucket-list li.empty {
+    min-height: 0;
+    padding: var(--space-1) 0 var(--space-2);
+    border-bottom: 0;
 }
