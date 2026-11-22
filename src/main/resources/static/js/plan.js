@@ -268,7 +268,13 @@ function renderExercises() {
     const container = $('exercises');
     container.innerHTML = '';
     plan.exercises.forEach((ex, index) => {
-        container.appendChild(index === editingIndex ? renderEditCard(index) : renderViewCard(ex, index));
+        const card = index === editingIndex ? renderEditCard(index) : renderViewCard(ex, index);
+        // While one Übung is edited, the others wait: no stray taps or tab stops
+        if (editingIndex !== null && index !== editingIndex) {
+            card.inert = true;
+            card.classList.add('is-locked');
+        }
+        container.appendChild(card);
     });
     observeExercises();
 }
@@ -283,10 +289,15 @@ function names(players, index) {
     return players.map((p, i) => who(p.name, index, i < players.length - 1 ? ',' : '')).join(' ');
 }
 
+// Played Übungen fold to one line during the training; tap to look back
+const openPlayed = new Set();
+
 function renderViewCard(ex, index) {
     const section = document.createElement('section');
     const now = nowIndex();
-    section.className = 'exercise' + (index === now ? ' is-now' : isPlayed(index) ? ' is-played' : '');
+    const played = isPlayed(index);
+    const open = !played || openPlayed.has(index);
+    section.className = 'exercise' + (index === now ? ' is-now' : played ? ' is-played' : '') + (open ? '' : ' is-collapsed');
     section.dataset.flipId = `card-${index}`;
     section.id = `ex-${index + 1}`;
     section.setAttribute('aria-labelledby', `ex-title-${index + 1}`);
@@ -298,49 +309,77 @@ function renderViewCard(ex, index) {
                 + `<span class="amp">&amp;</span>${who(p.player2.name, index)}</li>`).join('')
             + '</ul>';
     }
+    // Stations: label in its own column, names beside it
+    const station = (cls, tag, people) => `<li class="row row-station ${cls}"><span class="tag">${tag}</span>`
+        + `<span class="row-names">${people}</span></li>`;
     const stations = [];
     if (ex.mentalTrainer.length > 0) {
         const session = mentalSessionLabel(index);
-        stations.push(`<li class="row row-mental">
-        <span class="tag"><i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer${session ? ` · ${session}` : ''}</span>
-        ${names(ex.mentalTrainer, index)}</li>`);
+        stations.push(station('row-mental', `<i class="bi bi-lightbulb" aria-hidden="true"></i> Mentaltrainer${session ? ` · ${session}` : ''}`,
+            names(ex.mentalTrainer, index)));
     }
-    ex.balleimer.forEach((bucket, b) => stations.push(`<li class="row row-bucket">
-        <span class="tag"><i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}</span> ${names(bucket, index)}</li>`));
-    ex.sparring.forEach(sp => stations.push(`<li class="row row-sparring">
-        <span class="tag"><i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}</span>
-        ${who(sp.player.name, index)}</li>`));
-    if (ex.unpaired.length > 0) stations.push(`<li class="row row-pause">
-        <span class="tag">Ohne Partner</span> ${names(ex.unpaired, index)}</li>`);
+    ex.balleimer.forEach((bucket, b) => stations.push(station('row-bucket',
+        `<i class="bi bi-basket" aria-hidden="true"></i> Balleimer ${b + 1}`, names(bucket, index))));
+    ex.sparring.forEach(sp => stations.push(station('row-sparring',
+        `<i class="bi bi-person-badge" aria-hidden="true"></i> ${escapeHtml(sp.partner)}`, who(sp.player.name, index))));
+    if (ex.unpaired.length > 0) {
+        // Not a leftover: say what the kid does
+        stations.push(station('row-pause', 'Ohne Partner',
+            `${names(ex.unpaired, index)} <span class="row-note">spielt als Dritter bei einem Paar mit</span>`));
+    }
     if (stations.length > 0) {
         body += `<h3 class="group-label">Stationen</h3><ul class="rows">${stations.join('')}</ul>`;
     }
     body += hintsHtml(index, ex);
 
-    const badge = index === now ? '<span class="ex-badge is-now">Jetzt</span>'
-        : isPlayed(index) ? '<span class="ex-badge"><i class="bi bi-check2" aria-hidden="true"></i> Gespielt</span>'
+    const editBtn = `<button type="button" class="btn btn-quiet edit-btn" aria-label="${exerciseLabel(index + 1)} bearbeiten">
+                <i class="bi bi-pencil" aria-hidden="true"></i> <span class="btn-label">Bearbeiten</span></button>`;
+    if (played) {
+        section.innerHTML = `
+        <div class="exercise-head">
+            <h2 id="ex-title-${index + 1}"><button type="button" class="played-toggle" aria-expanded="${open}" aria-controls="ex-body-${index + 1}">
+                <i class="bi bi-check2" aria-hidden="true"></i> ${exerciseLabel(index + 1)} <span class="played-note">gespielt</span>
+                <i class="bi bi-chevron-down" aria-hidden="true"></i></button></h2>
+            ${open ? editBtn : ''}
+        </div>${open ? `<div id="ex-body-${index + 1}">${body}</div>` : ''}`;
+        section.querySelector('.played-toggle').addEventListener('click', () => togglePlayed(index));
+    } else {
+        const badge = index === now ? '<span class="ex-badge is-now">Jetzt</span>'
             : changedCards.has(index) ? '<span class="ex-badge is-changed">Neu eingeteilt</span>' : '';
-    section.innerHTML = `
+        section.innerHTML = `
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} ${badge}</h2>
-            <button type="button" class="btn btn-quiet" aria-label="${exerciseLabel(index + 1)} bearbeiten">
-                <i class="bi bi-pencil" aria-hidden="true"></i> <span class="btn-label">Bearbeiten</span></button>
+            ${editBtn}
         </div>${body}`;
-    section.querySelector('.exercise-head button').addEventListener('click', () => startEdit(index));
+    }
+    const edit = section.querySelector('.edit-btn');
+    if (edit) edit.addEventListener('click', () => startEdit(index));
     return section;
+}
+
+function togglePlayed(index) {
+    if (openPlayed.has(index)) openPlayed.delete(index);
+    else openPlayed.add(index);
+    const card = renderViewCard(plan.exercises[index], index);
+    $(`ex-${index + 1}`).replaceWith(card);
+    card.querySelector('.played-toggle').focus({ preventScroll: true });
+    if (openPlayed.has(index)) Motion.enter(card.querySelectorAll('.rows, .group-label'));
+    observeExercises();
 }
 
 // Editing: every kid of the Übung is a button. Tap one, then the one to swap
 // with; both change places. Every kid already has a place in each Übung, so
 // swapping covers every change a select could make.
 let pickedSlot = null;
+let swappedSlots = new Set(); // places changed in this edit, marked until saving
 
 function renderEditCard(index) {
     let slot = 0;
     const kid = (current, label) => {
         const i = slot++;
         const picked = i === pickedSlot;
-        return `<button type="button" class="slot-btn" data-slot="${i}" aria-pressed="${picked}"`
+        const moved = swappedSlots.has(i) ? ' is-swapped' : '';
+        return `<button type="button" class="slot-btn${moved}" data-slot="${i}" aria-pressed="${picked}"`
             + ` aria-label="${escapeHtml(label)}: ${escapeHtml(current.name)}">`
             + `<span class="slot-name" data-flip-id="${escapeHtml(current.name)}">${escapeHtml(current.name)}</span>`
             + `<span class="slot-elo">${current.elo}</span></button>`;
@@ -351,6 +390,7 @@ function renderEditCard(index) {
         ? 'Zwei Kinder nacheinander antippen – sie tauschen die Plätze.'
         : 'Jetzt das Kind antippen, mit dem getauscht wird.';
     let body = `<p class="info edit-hint" id="editHint">${hint}</p>`;
+    let regenBlock = '';
     draft.pairs.forEach((p, n) => {
         body += `<div class="slot-group slot-pair"><span class="tag">Paar ${n + 1}</span>
             ${kid(p.player1, `Paar ${n + 1}, erstes Kind`)}${kid(p.player2, `Paar ${n + 1}, zweites Kind`)}</div>`;
@@ -374,8 +414,9 @@ function renderEditCard(index) {
     body += hintsHtml(index, draft);
     if (index + 1 < total) {
         const rest = index + 2 === total ? `Übung ${total}` : `Übungen ${index + 2}–${total}`;
-        body += `<button type="button" class="btn btn-quiet btn-block btn-wrap regen-btn" id="regenerateBtn"${busy ? ' disabled' : ''}>
-            <i class="bi bi-shuffle" aria-hidden="true"></i> Speichern und ${rest} neu einteilen</button>`;
+        regenBlock = `<div class="regen-block"><p class="info">Oder diese Übung behalten und den Rest neu planen:</p>
+            <button type="button" class="btn btn-secondary btn-block btn-wrap regen-btn" id="regenerateBtn"${busy ? ' disabled' : ''}>
+            <i class="bi bi-shuffle" aria-hidden="true"></i> Speichern und ${rest} neu einteilen</button></div>`;
     }
 
     const section = document.createElement('section');
@@ -386,7 +427,7 @@ function renderEditCard(index) {
     section.innerHTML = `
         <div class="exercise-head">
             <h2 id="ex-title-${index + 1}">${exerciseLabel(index + 1)} <span class="visually-hidden">bearbeiten</span></h2>
-        </div>${body}`;
+        </div>${body}${regenBlock}`;
     section.querySelectorAll('.slot-btn').forEach(el =>
         el.addEventListener('click', () => tapSlot(parseInt(el.dataset.slot, 10))));
     const regen = section.querySelector('#regenerateBtn');
@@ -412,6 +453,8 @@ function tapSlot(slotIndex) {
     slots[first].set(b);
     slots[slotIndex].set(a);
     pickedSlot = null;
+    swappedSlots.add(first);
+    swappedSlots.add(slotIndex);
     // Both names glide to their new place
     Motion.flip(`#ex-${editingIndex + 1} .slot-name`, () => rerenderEdit(slotIndex));
     Motion.flash(document.querySelector(`.slot-btn[data-slot="${first}"]`));
@@ -530,8 +573,10 @@ function observeExercises() {
 // ===== EDITING =====
 function startEdit(index) {
     if (editingIndex !== null) saveEdit();
+    hideToast();
     editingIndex = index;
     pickedSlot = null;
+    swappedSlots = new Set();
     draft = clone(plan.exercises[index]);
     renderExercises();
     renderBar();
@@ -671,8 +716,9 @@ function renderAttendance() {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'toggle-chip';
+        // Pressed = fehlt, matching "Antippen = fehlt"
         const here = attendance.present.has(kid.name);
-        button.setAttribute('aria-pressed', String(here));
+        button.setAttribute('aria-pressed', String(!here));
         button.textContent = kid.name;
         button.addEventListener('click', () => {
             if (attendance.present.has(kid.name)) attendance.present.delete(kid.name);
@@ -703,7 +749,12 @@ function renderAttendance() {
         odd.textContent = `Zu wenige Kinder für alle Stationen (${attendance.present.size} da, ${attendance.present.size - playing} Plätze).`;
         apply.disabled = true;
     } else if (playing % 2 === 1) {
-        odd.textContent = 'Dann bleibt pro Übung 1 Kind ohne Partner.';
+        // Odd already before any change: a neutral note, not a warning about the tap just made
+        const before = plan.players.length - (plan.settings.balleimerSizes || []).reduce((sum, size) => sum + size, 0)
+            - plan.settings.sparringPartners.length - (plan.settings.mentalTrainerKids || 0);
+        const already = before % 2 === 1;
+        odd.textContent = already ? 'Schon jetzt bleibt pro Übung 1 Kind ohne Partner.' : 'Dann bleibt pro Übung 1 Kind ohne Partner.';
+        odd.classList.toggle('is-warn', !already);
     }
     odd.hidden = playing >= 0 && playing % 2 === 0;
     const fixBtn = $('missingFix');

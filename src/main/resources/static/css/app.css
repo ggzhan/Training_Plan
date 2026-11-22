@@ -568,15 +568,12 @@ h3.field-label {
     touch-action: manipulation;
 }
 
+/* Wer fehlt? Present kids stay neutral; a missing kid is struck through in red */
 .toggle-chip[aria-pressed="true"] {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-}
-
-.toggle-chip[aria-pressed="false"] {
-    color: var(--ink-2);
+    background: var(--danger-soft);
+    border-color: color-mix(in oklch, var(--danger) 45%, transparent);
+    color: var(--danger);
     text-decoration: line-through;
-    background: var(--surface-2);
 }
 
 /* ===== Notices ===== */
@@ -1942,4 +1939,173 @@ dialog.sheet-bottom[open] {
     min-height: 0;
     padding: var(--space-1) 0 var(--space-2);
     border-bottom: 0;
+}
+
+/* ===== Hall legibility ===== */
+/* The running Übung carries a solid band: readable at arm's length */
+.exercise.is-now {
+    padding-top: 0;
+    overflow: hidden;
+}
+
+.exercise.is-now .exercise-head {
+    margin: 0 calc(-1 * var(--space-4)) var(--space-4);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.exercise.is-now .exercise-head h2 {
+    color: var(--on-accent);
+}
+
+.exercise.is-now .ex-badge.is-now {
+    background: var(--on-accent);
+    color: var(--accent);
+}
+
+.exercise.is-now .edit-btn {
+    color: var(--on-accent);
+}
+
+@media (hover: hover) {
+    .exercise.is-now .edit-btn:not(:disabled):hover {
+        background: oklch(1 0 0 / 0.15);
+    }
+}
+
+/* Played and folded: one line with a check */
+.exercise.is-collapsed {
+    padding-block: var(--space-1);
+}
+
+.exercise.is-collapsed .exercise-head {
+    margin-bottom: 0;
+}
+
+.played-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--tap);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 1.125rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.played-note {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.played-toggle .bi-chevron-down {
+    margin-left: auto;
+    transition: transform 150ms ease-out;
+}
+
+.played-toggle[aria-expanded="true"] .bi-chevron-down {
+    transform: rotate(180deg);
+}
+
+.exercise.is-played .exercise-head h2 {
+    flex: 1;
+}
+
+/* Phones show one card at a time: the filled chip alone says where the training is */
+@media (max-width: 640px) {
+    .exnav-indicator {
+        display: none;
+    }
+}
+
+/* Station rows: label column, names beside it */
+.row-station {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+    column-gap: var(--space-3);
+}
+
+.row-names {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px var(--space-2);
+    min-width: 0;
+}
+
+.row-note {
+    flex-basis: 100%;
+    color: var(--ink-2);
+    font-size: 0.875rem;
+}
+
+/* Editing: the other Übungen wait */
+.exercise.is-locked {
+    opacity: 0.45;
+}
+
+.slot-btn.is-swapped:not([aria-pressed="true"]) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.regen-block {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+}
+
+.regen-block .info {
+    margin: 0 0 var(--space-2);
+}
+
+.regen-btn {
+    margin-top: 0;
+}
+
+/* Disabled tools look switched off, not pressed */
+.button-row.tools > .btn-secondary:disabled {
+    background: transparent;
+    border-style: dashed;
+    color: color-mix(in oklch, var(--ink-2) 70%, var(--bg));
+}
+
+/* Kid rows: rules in words */
+.rule-tag {
+    display: inline-block;
+    margin-left: var(--space-2);
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.rule-tag.is-off {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.rule-tag.is-star {
+    background: oklch(0.96 0.04 85);
+    color: oklch(0.45 0.12 70);
+}
+
+.elo-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px var(--space-2);
+}
+
+.elo-line .rule-tag {
+    margin-left: 0;
 }

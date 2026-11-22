@@ -57,6 +57,20 @@ function removeStored(key) {
 // One message at a time at the bottom, above the action bar. An action (e.g.
 // "Rückgängig") keeps it up longer.
 let toastTimer = null;
+// Toasts get out of the way: short, and gone as soon as the trainer touches the page
+function hideToast() {
+    const host = document.getElementById('toast');
+    if (!host || !host.firstChild) return;
+    clearTimeout(toastTimer);
+    const box = host.firstChild;
+    if (typeof Motion !== 'undefined') Motion.toastOut(box, () => box.remove());
+    else host.innerHTML = '';
+}
+
+document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest || !e.target.closest('#toast')) hideToast();
+}, true);
+
 function toast(message, action) {
     const host = document.getElementById('toast');
     if (!host) return;
@@ -84,7 +98,7 @@ function toast(message, action) {
     toastTimer = setTimeout(() => {
         if (hasMotion) Motion.toastOut(box, () => box.remove());
         else host.innerHTML = '';
-    }, action ? 6000 : 3000);
+    }, action ? 4500 : 2500);
 }
 
 // Keep page content clear of the fixed action bar, whatever its current height

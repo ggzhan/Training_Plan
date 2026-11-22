@@ -103,7 +103,7 @@ function renderPlayerList() {
         item.innerHTML = `
             <span class="who-block">
                 <span class="name">${name}</span>
-                <span class="elo-line">Elo ${player.elo}</span>
+                <span class="elo-line">Elo ${player.elo}${ruleTags(starred, noBucket, noSpar)}</span>
             </span>
             <button type="button" class="btn btn-icon star-toggle" aria-pressed="${starred}"
                 aria-label="Mehr Stationen für ${name}" title="${starred ? 'Mehr Stationen' : 'Normal'}">
@@ -126,6 +126,15 @@ function renderPlayerList() {
 
     renderRules();
     checkStations();
+}
+
+// Rules that are on show as words in the row, not only as icon states
+function ruleTags(starred, noBucket, noSpar) {
+    const tags = [];
+    if (starred) tags.push('<span class="rule-tag is-star">⭐ öfter</span>');
+    if (noBucket) tags.push('<span class="rule-tag is-off">kein Balleimer</span>');
+    if (noSpar) tags.push('<span class="rule-tag is-off">kein Sparring</span>');
+    return tags.join('');
 }
 
 function togglePlayerList() {
