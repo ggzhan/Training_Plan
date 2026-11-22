@@ -1703,7 +1703,8 @@ body.plan-page {
 
 /* Played: still readable for questions afterwards, but quieter than the running card */
 .exercise.is-played {
-    border-style: dashed;
+    background: var(--surface-2);
+    border-color: transparent;
 }
 
 .exercise.is-played h2,
@@ -2136,8 +2137,11 @@ dialog.sheet-bottom[open] {
 
 /* Entry bar on phones: one line of numbers; words only while they fit */
 @media (max-width: 480px) {
-    /* Hidden from sight only: screen readers still hear "18 Kinder, 7 Paare" */
-    #stationSummary:has(.stat:nth-child(4)) .stat:not(.is-warn) .stat-label {
+    /* Phones: the words stay for Kinder, Paare and warnings; the station counts
+       are hidden from sight only (screen readers still hear them, /plan lists them) */
+    #stationSummary .stat.is-bucket,
+    #stationSummary .stat.is-sparring,
+    #stationSummary .stat.is-mental {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -2482,4 +2486,64 @@ dialog.focus-dialog::backdrop {
 
 .focus-dialog .toast-host {
     bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+/* ===== Compact edit mode ===== */
+.slot-group {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.slot-group > .tag {
+    grid-column: 1 / -1;
+}
+
+.slot-btn {
+    min-height: var(--tap);
+    padding: 6px var(--space-2);
+    font-size: 0.9375rem;
+    line-height: 1.25;
+}
+
+.slot-elo {
+    font-size: 0.75rem;
+}
+
+.swap-preview {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-size: 0.875rem;
+}
+
+/* ===== Jetzt-Ansicht footer with undo ===== */
+.focus-foot #focusLeave,
+.focus-foot #focusUndo {
+    flex-basis: 56px;
+}
+
+@media (max-width: 599px) {
+    .focus-next .bi {
+        display: none;
+    }
+
+    .focus-next {
+        font-size: 1rem;
+        padding: 0 var(--space-2);
+    }
+}
+
+/* ===== Desktop and details ===== */
+@media (min-width: 900px) {
+    .button-row.tools > .tool-main {
+        flex: 0 0 auto;
+        min-width: 13rem;
+    }
+}
+
+.player-list li {
+    padding-block: 6px;
 }

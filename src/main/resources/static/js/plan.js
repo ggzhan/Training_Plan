@@ -524,10 +524,23 @@ function renderEditWarn() {
         + (serious.length > 2 ? ` <span>(+${serious.length - 2})</span>` : '');
 }
 
+// While a kid is picked, a strip above Speichern keeps the choice in view
+function renderSwapPreview() {
+    const strip = $('swapPreview');
+    if (editingIndex === null || pickedSlot === null) {
+        strip.hidden = true;
+        return;
+    }
+    const kid = slotsOf(draft)[pickedSlot].get();
+    strip.hidden = false;
+    strip.innerHTML = `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> <strong>${escapeHtml(kid.name)}</strong> (Elo ${kid.elo}) gewählt – Tauschpartner antippen`;
+}
+
 function rerenderEdit(focusSlot) {
     const old = $(`ex-${editingIndex + 1}`);
     old.replaceWith(renderEditCard(editingIndex));
     renderEditWarn();
+    renderSwapPreview();
     const again = document.querySelector(`.slot-btn[data-slot="${focusSlot}"]`);
     if (again) again.focus({ preventScroll: true });
 }
@@ -553,6 +566,7 @@ function renderBar() {
     $('viewBar').hidden = editing;
     $('editBar').hidden = !editing;
     renderEditWarn();
+    renderSwapPreview();
     renderNav();
     if (switched) Motion.enter([editing ? $('editBar') : $('viewBar')]);
     $('undoBtn').disabled = historyStack.length === 0 || busy;
@@ -826,16 +840,16 @@ function renderAttendance() {
         odd.textContent = `Zu wenige Kinder für alle Stationen (${attendance.present.size} da, ${attendance.present.size - playing} Plätze).`;
         apply.disabled = true;
     } else if (playing % 2 === 1) {
-        // Odd already before any change: a neutral note, not a warning about the tap just made
-        const before = plan.players.length - (plan.settings.balleimerSizes || []).reduce((sum, size) => sum + size, 0)
-            - plan.settings.sparringPartners.length - (plan.settings.mentalTrainerKids || 0);
-        const already = before % 2 === 1;
-        odd.textContent = already ? 'Schon jetzt spielt pro Übung 1 Kind als Dritter mit.' : 'Dann spielt pro Übung 1 Kind als Dritter mit.';
-        odd.classList.toggle('is-warn', !already);
+        odd.textContent = 'Dann spielt pro Übung 1 Kind als Dritter mit.';
+        odd.classList.add('is-warn');
     }
-    odd.hidden = playing >= 0 && playing % 2 === 0;
+    // Only when the taps here make the count odd: an odd count from before is no news
+    const before = plan.players.length - (plan.settings.balleimerSizes || []).reduce((sum, size) => sum + size, 0)
+        - plan.settings.sparringPartners.length - (plan.settings.mentalTrainerKids || 0);
+    const newlyOdd = playing >= 0 && playing % 2 === 1 && before % 2 === 0;
+    odd.hidden = !(playing < 0 || newlyOdd);
     const fixBtn = $('missingFix');
-    fixBtn.hidden = !fix;
+    fixBtn.hidden = !fix || !newlyOdd;
     if (fix) {
         fixBtn.textContent = fix.label;
         fixBtn.onclick = () => {
